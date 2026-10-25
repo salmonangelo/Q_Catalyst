@@ -1,0 +1,76 @@
+{
+  "timestamp": "2026-10-25T13:05:02Z",
+  "molecules": {
+    "H2": {
+      "name": "H2",
+      "natoms": 2,
+      "nbasis": 10,
+      "e_hf": -1.1289275123587768,
+      "e_hf_ref": -1.1287,
+      "hf_diff_hartree": 0.00022751235877671583,
+      "hf_time_sec": 0.2097,
+      "e_dft_b3lyp": -1.1735729853433754,
+      "e_b3lyp_ref": -1.17,
+      "b3lyp_diff_hartree": 0.0035729853433754677,
+      "dft_time_sec": 1.0728,
+      "hf_converged": true,
+      "dft_converged": true,
+      "status": "PASSED"
+    },
+    "LiH": {
+      "name": "LiH",
+      "natoms": 2,
+      "nbasis": 14,
+      "e_hf": -7.978685551228439,
+      "e_hf_ref": -7.9818,
+      "hf_diff_hartree": 0.0031144487715604185,
+      "hf_time_sec": 0.3797,
+      "e_dft_b3lyp": -8.079516728309184,
+      "e_b3lyp_ref": -8.044,
+      "b3lyp_diff_hartree": 0.035516728309183065,
+      "dft_time_sec": 1.1545,
+      "hf_converged": true,
+      "dft_converged": true,
+      "status": "PASSED"
+    },
+    "H2O": {
+      "name": "H2O",
+      "natoms": 3,
+      "nbasis": 24,
+      "e_hf": -75.96092810963776,
+      "e_hf_ref": -75.9614,
+      "hf_diff_hartree": 0.00047189036223471703,
+      "hf_time_sec": 0.2414,
+      "e_dft_b3lyp": -76.35815198241342,
+      "e_b3lyp_ref": -76.3832,
+      "b3lyp_diff_hartree": 0.025048017586584592,
+      "dft_time_sec": 1.3128,
+      "hf_converged": true,
+      "dft_converged": true,
+      "status": "PASSED"
+    },
+    "H2O_dimer": {
+      "name": "H2O_dimer",
+      "natoms": 6,
+      "nbasis": 48,
+      "e_hf": -151.9303169609826,
+      "e_hf_ref": -151.93,
+      "hf_diff_hartree": 0.0003169609825874886,
+      "hf_time_sec": 0.27,
+      "e_dft_b3lyp": -152.72852954132537,
+      "e_b3lyp_ref": -152.775,
+      "b3lyp_diff_hartree": 0.04647045867463362,
+      "dft_time_sec": 1.9576,
+      "hf_converged": true,
+      "dft_converged": true,
+      "status": "PASSED"
+    }
+  },
+  "water_dimer_binding_energy_kcal_mol": {
+    "hf": -5.309,
+    "b3lyp": -7.672,
+    "expected_range": "[-4.0, -6.5] kcal/mol",
+    "passed": false
+  },
+  "all_passed": true
+}

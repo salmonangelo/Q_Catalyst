@@ -1,0 +1,22 @@
+{
+  "timestamp": "2026-10-26T01:56:29Z",
+  "ispetase_5xjh": {
+    "d_ser160_og_his237_ne2_A": 2.923,
+    "d_his237_nd1_asp206_od2_A": 2.675,
+    "e_dft_b3lyp_ha": -1034.825159,
+    "charge_ser160_og": -0.2789
+  },
+  "fast_petase_7sh6": {
+    "d_ser160_og_his237_ne2_A": 2.851,
+    "d_his237_nd1_asp206_od2_A": 2.662,
+    "e_dft_b3lyp_ha": -1037.062353,
+    "charge_ser160_og": -0.2723
+  },
+  "directional_shift": {
+    "delta_d_ser_his_A": -0.072,
+    "delta_d_his_asp_A": -0.013,
+    "delta_charge_ser_og": 0.0066,
+    "literature_benchmark": "Acylation barrier 12.1 kcal/mol (FAST-PETase) vs 16.5 kcal/mol (IsPETase)",
+    "plausibility_verdict": "CONSISTENT (FAST-PETase maintains intact, slightly tightened catalytic triad geometry and preserved nucleophile polarisation)"
+  }
+}
