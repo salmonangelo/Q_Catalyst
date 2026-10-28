@@ -1,0 +1,29 @@
+# Q-Catalyst Protein AI Model Configuration
+
+esm1v:
+  model_name: "facebook/esm1v_t33_650M_UR90S_1"
+  model_version: "v1"
+  scoring_strategy: "masked_marginal"
+  ensemble_members:
+    - "facebook/esm1v_t33_650M_UR90S_1"
+    - "facebook/esm1v_t33_650M_UR90S_2"
+    - "facebook/esm1v_t33_650M_UR90S_3"
+    - "facebook/esm1v_t33_650M_UR90S_4"
+    - "facebook/esm1v_t33_650M_UR90S_5"
+  cache_dir: "env/cache/models/esm1v"
+  device: "cpu"
+  batch_size: 1
+  max_sequence_length: 1024
+  allow_downloads_at_home: false
+  mock_fallback: true
+
+esm2:
+  embedding_model: "facebook/esm2_t6_8M_UR50D" # Lightweight test model (8M params)
+  production_model: "facebook/esm2_t33_650M_UR50D"
+  cache_dir: "env/cache/models/esm2"
+  pooling: "mean"
+
+supervised:
+  preferred_model: "xgboost"
+  comparison_baseline: "ridge"
+  random_seed: 42

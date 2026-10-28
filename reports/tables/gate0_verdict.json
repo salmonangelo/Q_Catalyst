@@ -1,0 +1,65 @@
+{
+  "target_name": "activity",
+  "parent_enzyme": "IsPETase",
+  "n_held_out": 149,
+  "primary_metric_name": "aggregate_uncertainty",
+  "spearman_rho": 0.26323245589269617,
+  "spearman_pvalue": 0.0011807096173908431,
+  "ci_level": 0.95,
+  "ci_lower": 0.08478404152441525,
+  "ci_upper": 0.4216899475281957,
+  "n_bootstrap": 2000,
+  "ci_includes_zero": false,
+  "worst_error_quartile_threshold": 0.44365581691265105,
+  "worst_error_quartile_count": 38,
+  "auroc": 0.5008297771455665,
+  "auroc_status": "valid",
+  "gate_passed": true,
+  "verdict": "PASS",
+  "decision_rule": "Gate 0 PASSES if and only if the 95% bootstrap confidence interval for Spearman correlation between uncertainty and absolute error strictly excludes zero (CI_lower > 0.0). If CI_lower <= 0.0, Gate 0 FAILS and Role 4 must use diversity-based selection instead of uncertainty-based gating.",
+  "recommended_action": "PROCEED_WITH_UNCERTAINTY_GATING",
+  "rationale": "The 95% bootstrap CI for Spearman rho [0.0848, 0.4217] is strictly positive and excludes zero (p=1.18e-03). Uncertainty scores reliably monotonically correlate with absolute prediction errors on held-out variants. Role 4 is authorized to apply uncertainty gating.",
+  "components": {
+    "aggregate_uncertainty": {
+      "component_name": "Aggregate Uncertainty U(x)",
+      "spearman_rho": 0.26323245589269617,
+      "spearman_pvalue": 0.0011807096173908431,
+      "ci_lower": 0.08478404152441525,
+      "ci_upper": 0.4216899475281957,
+      "ci_includes_zero": false,
+      "worst_quartile_auroc": 0.5008297771455665,
+      "auroc_status": "valid"
+    },
+    "u_ensemble_std": {
+      "component_name": "Ensemble Disagreement (Std)",
+      "spearman_rho": 0.04922546707781607,
+      "spearman_pvalue": 0.5510586293876129,
+      "ci_lower": -0.12018570983178631,
+      "ci_upper": 0.22083798012460662,
+      "ci_includes_zero": true,
+      "worst_quartile_auroc": 0.41678520625889043,
+      "auroc_status": "valid"
+    },
+    "u_ood_distance": {
+      "component_name": "ESM-2 Embedding OOD Distance",
+      "spearman_rho": 0.4354602377381758,
+      "spearman_pvalue": 2.853084084135073e-08,
+      "ci_lower": 0.3073578091098615,
+      "ci_upper": 0.5526271901300793,
+      "ci_includes_zero": false,
+      "worst_quartile_auroc": 0.700687529634898,
+      "auroc_status": "valid"
+    },
+    "u_conformal_width": {
+      "component_name": "Conformal Prediction Interval Width",
+      "spearman_rho": -0.03592519160808034,
+      "spearman_pvalue": 0.6635840956890227,
+      "ci_lower": -0.1982782145862284,
+      "ci_upper": 0.13104695627181848,
+      "ci_includes_zero": true,
+      "worst_quartile_auroc": 0.43266951161688005,
+      "auroc_status": "valid"
+    }
+  },
+  "disclaimer": "Computational uncertainty validation on held-out retrospective data; not experimental wet-lab verification."
+}

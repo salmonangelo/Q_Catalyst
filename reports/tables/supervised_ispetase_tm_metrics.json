@@ -1,0 +1,27 @@
+{
+  "enzyme": "IsPETase",
+  "target": "tm",
+  "split_strategy": "single_to_multi",
+  "n_train": 84,
+  "n_eval": 149,
+  "xgboost": {
+    "mae": 10.3317,
+    "rmse": 15.9019,
+    "r2": -0.552,
+    "pearson_r": 0.2461,
+    "pearson_pvalue": 0.0024835,
+    "spearman_rho": 0.3697,
+    "spearman_pvalue": 3.4873e-06,
+    "n_samples": 149
+  },
+  "ridge": {
+    "mae": 11.4134,
+    "rmse": 18.177,
+    "r2": -1.0278,
+    "pearson_r": -0.0709,
+    "pearson_pvalue": 0.39029,
+    "spearman_rho": 0.176,
+    "spearman_pvalue": 0.031781,
+    "n_samples": 149
+  }
+}

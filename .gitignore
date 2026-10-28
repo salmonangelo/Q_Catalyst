@@ -1,0 +1,24 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Caches and environments
+.pytest_cache/
+env/cache/
+.cache/
+*.pt
+*.bin
+*.safetensors
+*.onnx
+
+# Large embeddings and generated array caches
+results/embeddings/
+*.npz
+*.npy
+*.h5
+*.parquet.tmp
+
+# Scratch files
+scratch/
+.system_generated/
