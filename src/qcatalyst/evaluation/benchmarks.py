@@ -64,11 +64,11 @@ def score_arm_a0_random(
     n_permutations: int = 20,
 ) -> np.ndarray:
     """Generate averaged random rank scores across multiple random seeds for baseline A0."""
+    # A single reproducible random permutation gives an actual random ranking.
+    # Averaging random scores per item makes scores nearly tied and is not the same
+    # as averaging the evaluation metrics over independent random rankings.
     rng = np.random.default_rng(random_seed)
-    scores = np.zeros(n_samples, dtype=np.float64)
-    for _ in range(n_permutations):
-        scores += rng.uniform(0.0, 1.0, size=n_samples)
-    return scores / n_permutations
+    return rng.permutation(n_samples).astype(np.float64)
 
 
 def score_arm_a1_esm1v(
@@ -79,8 +79,8 @@ def score_arm_a1_esm1v(
     """Score variants using ESM-1v zero-shot mutation-effect model for baseline A1."""
     if not mock:
         for candidate_path in [
-            Path("results/predictions/real_esm1v_scores.parquet"),
             Path("results/predictions/esm1v_scores.parquet"),
+            Path("results/predictions/real_esm1v_scores.parquet"),
         ]:
             if candidate_path.exists():
                 try:
@@ -91,9 +91,19 @@ def score_arm_a1_esm1v(
                         and "run_status" in cached_df.columns
                     ):
                         cached_real = cached_df[cached_df["run_status"] == "success"]
-                        id_map = dict(zip(cached_real["variant_id"], cached_real["score"]))
-                        if all(vid in id_map for vid in variants_df["variant_id"]):
-                            return variants_df["variant_id"].map(id_map).to_numpy(dtype=np.float64)
+                        if "feature_source" in cached_real.columns:
+                            cached_real = cached_real[
+                                cached_real["feature_source"].astype(str) == "esm1v_zero_shot_llr"
+                            ]
+                        if "model_name" in cached_real.columns:
+                            cached_real = cached_real[
+                                cached_real["model_name"].astype(str)
+                                == "facebook/esm1v_t33_650M_UR90S_1"
+                            ]
+                        id_map = dict(zip(cached_real["variant_id"].astype(str), cached_real["score"]))
+                        requested_ids = variants_df["variant_id"].astype(str)
+                        if all(vid in id_map for vid in requested_ids):
+                            return requested_ids.map(id_map).to_numpy(dtype=np.float64)
                 except Exception:
                     pass
 
@@ -254,7 +264,7 @@ def run_benchmark_suite(
                 random_seed=random_seed,
                 compute_cost_cpu_seconds=round(cost_a0, 4),
                 status="evaluated",
-                provenance="Averaged uniform random permutations (seeds 42..62)",
+                provenance="Single uniform random permutation (fixed seed); bootstrap CI over held-out variants",
             ).to_dict()
         )
 
