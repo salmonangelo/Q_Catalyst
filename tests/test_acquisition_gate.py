@@ -98,6 +98,10 @@ def test_candidate_gate_marks_invalid_rows_and_preserves_policy():
     assert output.loc[0, "chemistry_mapping_eligible"] is True or bool(output.loc[0, "chemistry_mapping_eligible"])
     assert not output["uncertainty_gating_enabled"].any()
     assert (output["acquisition_mode"] == "diversity_fallback").all()
+    assert output.loc[0, "combined_gate_status"] == "ELIGIBLE_DIVERSITY_FALLBACK_PENDING_ROLE2_3D_GATE"
+    assert output.loc[1, "combined_gate_status"] == "REJECT_ROLE1_INPUT_RULES"
+    assert output.loc[2, "combined_gate_status"] == "REJECT_ROLE1_INPUT_RULES"
+    assert (output["role2_3d_geometry_gate_status"] == "NOT_RUN_PENDING_ROLE2").all()
     assert "not_multi_mutant" in output.loc[1, "role1_candidate_gate_reason"]
     assert "missing_or_nonfinite_activity_prediction" in output.loc[2, "role1_candidate_gate_reason"]
 
