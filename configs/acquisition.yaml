@@ -1,0 +1,42 @@
+# Q-Catalyst acquisition and gate policy.
+# The Role 1 code reads these rules; downstream chemistry selection must still
+# run Role 2's actual structure/geometry eligibility checks before spending compute.
+
+schema_version: 1
+
+gate0:
+  confidence_level: 0.95
+  min_bootstrap_resamples: 1000
+  pass_if_ci_lower_strictly_greater_than: 0.0
+  on_fail_action: "FALLBACK_TO_DIVERSITY_SELECTION"
+  on_pass_action: "PROCEED_WITH_UNCERTAINTY_GATING"
+  fail_closed_on_missing_or_inconsistent_artifact: true
+
+candidate_gate:
+  require_single_to_multi_heldout_split: true
+  minimum_mutations: 2
+  exclude_duplicate_records: true
+  require_nonempty_mutant_sequence: true
+  require_finite_supervised_activity_prediction: true
+  require_finite_real_esm1v_score: true
+  require_finite_composite_uncertainty: true
+  require_structure_mapping_for_chemistry: true
+  esm1v_model_id: "facebook/esm1v_t33_650M_UR90S_1"
+  esm1v_scoring_method: "masked_marginal"
+  esm2_embedding_model_id: "facebook/esm2_t12_35M_UR50D"
+  esm2_embedding_dimensions: 480
+
+diversity_fallback:
+  # These are handoff defaults for Role 4's selector, not weights used by the
+  # Role 1 data-quality gate itself.
+  sequence_embedding_diversity_weight: 0.50
+  predicted_activity_weight: 0.35
+  estimated_compute_cost_weight: 0.15
+  uncertainty_weight: 0.00
+  uncertainty_enabled_after_gate0_fail: false
+
+scientific_limits:
+  structural_mapping_is_not_3d_proximity: true
+  require_role2_geometry_check_before_chemistry: true
+  model_predictions_are_not_wet_lab_validation: true
+  zero_shot_llr_is_not_direct_activity: true
