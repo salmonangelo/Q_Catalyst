@@ -119,7 +119,7 @@ class ESMScorerConfig:
     cache_dir: str | Path | None = None
     output_dir: str | Path = "results/predictions/esm1v"
     device: str = "cpu"
-    mock: bool = True  # Default to True to protect 500 MB download budget
+    mock: bool = False  # Real pretrained inference by default; tests must explicitly request mock=True
     batch_size: int = 1
 
 
