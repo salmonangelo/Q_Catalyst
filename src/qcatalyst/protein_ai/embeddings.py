@@ -83,6 +83,10 @@ class EmbeddingIndexEntry:
     cache_path: str
     status: str  # 'computed', 'cached', 'mocked'
     is_finite: bool
+    feature_source: str = "real_esm2_35M"  # 'real_esm2_35M' or 'mock_synthetic'
+    device: str = "cpu"
+    software_version: str = "transformers-4.49.0"
+    checkpoint_provenance: str = "HuggingFace Hub: facebook/esm2_t12_35M_UR50D"
 
 
 class ESM2Embedder:
@@ -131,9 +135,10 @@ class ESM2Embedder:
             ) from exc
 
     def _get_cache_path(self, seq_hash: str) -> Path:
-        """Construct safe path for cached embedding file."""
+        """Construct safe path for cached embedding file, strictly separating real from mock."""
         model_safe = self.config.model_id.replace("/", "_").replace("\\", "_")
-        sub_dir = self.config.cache_dir / model_safe
+        prefix = "mock_" if self.config.mock else "real_"
+        sub_dir = self.config.cache_dir / f"{prefix}{model_safe}"
         sub_dir.mkdir(parents=True, exist_ok=True)
         return sub_dir / f"{seq_hash}_{self.config.pooling_strategy}.npz"
 
@@ -191,12 +196,21 @@ class ESM2Embedder:
         cache_path = self._get_cache_path(seq_hash)
         dim = self.config.expected_dim or 480
 
+        feature_source = "mock_synthetic" if self.config.mock else "real_esm2_35M"
+        provenance = (
+            "Deterministic mock offline proxy"
+            if self.config.mock
+            else f"HuggingFace Hub: {self.config.model_id}"
+        )
+
         # 1. Check cache lookup
         if not force_recompute and cache_path.exists():
             try:
                 data = np.load(cache_path)
                 cached_vec = data["embedding"].astype(np.float32)
                 if cached_vec.shape == (dim,) and np.all(np.isfinite(cached_vec)):
+                    cached_source = str(data.get("feature_source", feature_source))
+                    cached_prov = str(data.get("checkpoint_provenance", provenance))
                     entry = EmbeddingIndexEntry(
                         variant_id=variant_id,
                         sequence_hash=seq_hash,
@@ -207,6 +221,10 @@ class ESM2Embedder:
                         cache_path=str(cache_path.as_posix()),
                         status="cached",
                         is_finite=True,
+                        feature_source=cached_source,
+                        device=self.config.device,
+                        software_version="transformers-4.49.0",
+                        checkpoint_provenance=cached_prov,
                     )
                     return cached_vec, entry
             except Exception:
@@ -225,16 +243,6 @@ class ESM2Embedder:
         if not is_finite:
             raise ValueError(f"Computed embedding contains non-finite values (NaN/Inf) for variant {variant_id}")
 
-        # 3. Save to cache (.npz)
-        np.savez_compressed(
-            cache_path,
-            embedding=vec,
-            sequence_hash=seq_hash,
-            variant_id=variant_id,
-            model_id=self.config.model_id,
-            pooling=self.config.pooling_strategy,
-        )
-
         entry = EmbeddingIndexEntry(
             variant_id=variant_id,
             sequence_hash=seq_hash,
@@ -245,30 +253,87 @@ class ESM2Embedder:
             cache_path=str(cache_path.as_posix()),
             status=status,
             is_finite=is_finite,
+            feature_source=feature_source,
+            device=self.config.device,
+            software_version="transformers-4.49.0",
+            checkpoint_provenance=provenance,
+        )
+
+        # 3. Save to cache (.npz)
+        np.savez_compressed(
+            cache_path,
+            embedding=vec,
+            sequence_hash=seq_hash,
+            variant_id=variant_id,
+            model_id=self.config.model_id,
+            model_version=self.config.model_version,
+            pooling=self.config.pooling_strategy,
+            dimensions=dim,
+            feature_source=feature_source,
+            device=self.config.device,
+            software_version="transformers-4.49.0",
+            status=status,
+            is_finite=is_finite,
+            checkpoint_provenance=provenance,
         )
 
         return vec, entry
 
     def _compute_torch_embedding(self, sequence: str) -> np.ndarray:
-        """Run PyTorch forward pass in evaluation mode with gradients disabled."""
+        """Run PyTorch forward pass in evaluation mode with gradients disabled.
+
+        Applies residue-only mean pooling using the attention mask:
+        - Tokenizes sequence with standard special tokens (<cls>, <eos>).
+        - Excludes special tokens (<cls>, <eos>, <pad>) via attention and token masks.
+        - Calculates unweighted average across genuine amino-acid residue positions.
+        """
         import torch
 
-        inputs = self._tokenizer(sequence, return_tensors="pt").to(self.config.device)
+        inputs = self._tokenizer(
+            sequence,
+            return_tensors="pt",
+            padding=False,
+            add_special_tokens=True,
+        ).to(self.config.device)
+
+        input_ids = inputs["input_ids"]  # Shape: (1, seq_len)
+        attention_mask = inputs["attention_mask"]  # Shape: (1, seq_len)
 
         with torch.no_grad():
             outputs = self._model(**inputs)
-            last_hidden_state = outputs.last_hidden_state[0]  # Shape: (seq_len + 2, hidden_dim)
+            last_hidden_state = outputs.last_hidden_state  # Shape: (1, seq_len, hidden_dim)
 
         if self.config.pooling_strategy == "mean":
-            # Exclude special tokens: BOS (idx 0) and EOS (idx -1)
-            residue_embeddings = last_hidden_state[1:-1]
-            pooled = residue_embeddings.mean(dim=0)
-        elif self.config.pooling_strategy in ("bos", "cls"):
-            pooled = last_hidden_state[0]
-        else:
-            pooled = last_hidden_state[1:-1].mean(dim=0)
+            # Mask identifying genuine amino acid residue tokens strictly
+            is_residue = (
+                (input_ids != self._tokenizer.cls_token_id)
+                & (input_ids != self._tokenizer.eos_token_id)
+                & (input_ids != self._tokenizer.pad_token_id)
+                & (attention_mask == 1)
+            )
 
-        return pooled.cpu().numpy().astype(np.float32)
+            expanded_mask = is_residue.unsqueeze(-1).float()  # (1, seq_len, 1)
+            sum_embeddings = (last_hidden_state * expanded_mask).sum(dim=1)  # (1, hidden_dim)
+            residue_count = is_residue.sum(dim=1, keepdim=True).float().clamp(min=1.0)
+            pooled = sum_embeddings / residue_count
+            return pooled[0].cpu().numpy().astype(np.float32)
+
+        elif self.config.pooling_strategy in ("bos", "cls"):
+            # BOS representation (<cls> token at index 0)
+            return last_hidden_state[0, 0].cpu().numpy().astype(np.float32)
+        else:
+            # Default to residue-only mean pooling
+            is_residue = (
+                (input_ids != self._tokenizer.cls_token_id)
+                & (input_ids != self._tokenizer.eos_token_id)
+                & (input_ids != self._tokenizer.pad_token_id)
+                & (attention_mask == 1)
+            )
+            expanded_mask = is_residue.unsqueeze(-1).float()
+            sum_embeddings = (last_hidden_state * expanded_mask).sum(dim=1)
+            residue_count = is_residue.sum(dim=1, keepdim=True).float().clamp(min=1.0)
+            pooled = sum_embeddings / residue_count
+            return pooled[0].cpu().numpy().astype(np.float32)
 
     def extract_batch(
         self,
