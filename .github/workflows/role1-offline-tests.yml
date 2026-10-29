@@ -1,0 +1,48 @@
+name: Role 1 offline tests
+
+on:
+  push:
+    branches:
+      - main
+      - feature/role1-end-to-end-pipeline
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  role1-offline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install package and test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[test]"
+      - name: Compile changed Role 1 modules
+        run: |
+          python -m compileall -q src/qcatalyst/acquisition src/qcatalyst/uncertainty src/qcatalyst/protein_ai src/qcatalyst/evaluation scripts/run_ai.py scripts/run_role1_pipeline.py scripts/select_candidates.py
+      - name: Run offline Role 1 and regression tests
+        env:
+          MPLBACKEND: Agg
+        run: |
+          python -m pytest \
+            tests/test_acquisition_gate.py \
+            tests/test_gate0.py \
+            tests/test_uncertainty.py \
+            tests/test_predictor.py \
+            tests/test_benchmarks.py \
+            tests/test_protein_ai.py \
+            tests/test_embeddings.py
+      - name: Verify CLI entrypoint
+        run: python scripts/run_role1_pipeline.py --help
