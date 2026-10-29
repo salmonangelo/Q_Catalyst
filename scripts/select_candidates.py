@@ -197,14 +197,14 @@ def apply_acquisition_ranking(
         "diversity": diversity_score,
         "activity": activity_score,
     }
-    active_weights = {
-        key: weight for key, weight in weights.items()
-        if weight > 0.0 and key in score_components | ({"uncertainty": uncertainty_score} if uncertainty_enabled else {})
-    }
     if cost_score is not None and weights.get("cost", 0.0) > 0.0:
         score_components["cost"] = cost_score
     if uncertainty_enabled:
         score_components["uncertainty"] = uncertainty_score
+    active_weights = {
+        key: weight for key, weight in weights.items()
+        if weight > 0.0 and key in score_components
+    }
 
     if not active_weights:
         raise ValueError("Acquisition policy has no available positive-weight score components.")
