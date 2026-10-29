@@ -139,7 +139,9 @@ $$a(x) = \mu D(x) + \eta P(x) - \nu C(x)$$
 | **A1** | Real ESM-1v Zero-Shot Ranking | 0.00 | 0.00 | 0.00 | 0.00x | 0.324 | -0.387 |
 | **A2** | Supervised XGBoost + Structural | **0.40** | **0.20** | **0.15** | **1.86x** | **0.406** | **0.107** |
 
-*These numbers are from a previous artifact snapshot. The integration branch changes the A0 ranking and A2 prediction source; regenerate the benchmark before presenting any A0–A2 metrics as results from the current branch.*
+*These numbers are from a previous artifact snapshot. The integration branch changes the A0 ranking and A2 prediction source; regenerate the benchmark before presenting any A0–A2 metrics as results from the current branch.
+
+**Implemented on the Role 1 integration branch:** the candidate artifact now includes `acquisition_score` and `acquisition_rank`. Under Gate 0 failure, the implementation uses nearest-training-pool cosine diversity in real ESM-2 space and the rank percentile of `y_pred_mean`; measured compute-cost estimates are included only if present. When cost is missing, it is omitted and available weights are renormalized rather than imputed. The branch also configures a separate uncertainty-guided score for a future valid Gate 0 PASS; these explicit weights remain configurable policy defaults, not empirically optimized values. The output still marks candidates as pending Role 2's 3D geometry gate.*
 
 ---
 
