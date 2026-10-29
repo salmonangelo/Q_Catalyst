@@ -37,7 +37,7 @@ def test_gate0_negative_ci_fails_to_diversity_even_when_it_does_not_span_zero():
     assert result.ci_upper == -0.13
     assert result.uncertainty_gating_enabled is False
     assert result.acquisition_mode == "diversity_fallback"
-    assert "inverse association" in result.rationale
+    assert "inverse uncertainty/error association" in result.rationale
 
 
 def test_gate0_inconsistent_artifact_fails_closed():
