@@ -23,7 +23,11 @@ if str(REPO_ROOT) not in sys.path:
 if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
-from qcatalyst.acquisition.gate import annotate_candidate_gate, resolve_gate0_policy
+from qcatalyst.acquisition.gate import (
+    annotate_candidate_gate,
+    load_acquisition_config,
+    resolve_gate0_policy,
+)
 
 
 def build_role1_candidate_gate(
@@ -40,6 +44,8 @@ def build_role1_candidate_gate(
     target_name: str = "activity",
 ) -> dict[str, Any]:
     """Join v2 held-out predictions and return a machine-readable policy summary."""
+    policy = load_acquisition_config()
+    candidate_rules = policy["candidate_gate"]
     required_files = [
         variants_path, predictions_path, uncertainty_path, esm1v_scores_path,
         embedding_index_path, gate0_verdict_path, split_manifest_path,
@@ -85,7 +91,7 @@ def build_role1_candidate_gate(
         if "variant_id" not in frame.columns:
             raise ValueError(f"{name} artifact is missing variant_id.")
         frame["variant_id"] = frame["variant_id"].astype(str)
-    required_embedding_columns = {"variant_id", "feature_source", "dimensions", "is_finite", "status", "sequence_hash"}
+    required_embedding_columns = {"variant_id", "model_id", "feature_source", "dimensions", "is_finite", "status", "sequence_hash"}
     missing_embedding_columns = required_embedding_columns.difference(embedding_index.columns)
     if missing_embedding_columns:
         raise ValueError(
@@ -95,10 +101,19 @@ def build_role1_candidate_gate(
     embedding_index["variant_id"] = embedding_index["variant_id"].astype(str)
     if embedding_index["variant_id"].duplicated().any():
         raise ValueError("ESM-2 embedding index contains duplicate variant IDs.")
-    if not (embedding_index["feature_source"].astype(str) == "real_esm2_35M").all():
+    if not (
+        embedding_index["feature_source"].astype(str) == "real_esm2_35M"
+    ).all():
         raise ValueError("ESM-2 embedding index contains mock or unexpected embedding provenance.")
-    if not (embedding_index["dimensions"].astype(int) == 480).all():
-        raise ValueError("ESM-2 embedding index has dimensions other than 480.")
+    if not (
+        embedding_index["model_id"].astype(str) == str(candidate_rules["esm2_embedding_model_id"])
+    ).all():
+        raise ValueError("ESM-2 embedding index contains an unexpected model identifier.")
+    if not (
+        embedding_index["dimensions"].astype(int)
+        == int(candidate_rules["esm2_embedding_dimensions"])
+    ).all():
+        raise ValueError("ESM-2 embedding index has dimensions other than the configured 480.")
     if not embedding_index["is_finite"].astype(bool).all():
         raise ValueError("ESM-2 embedding index includes non-finite embeddings.")
     if pred["variant_id"].duplicated().any():
@@ -107,13 +122,20 @@ def build_role1_candidate_gate(
         raise ValueError("Uncertainty artifact has duplicate held-out variant IDs.")
     if scores["variant_id"].duplicated().any():
         scores = scores.drop_duplicates(subset=["variant_id"], keep="last")
-    if "score" not in scores.columns:
-        raise ValueError("ESM-1v scores artifact is missing score column.")
-    if "run_status" not in scores.columns:
-        raise ValueError("ESM-1v scores artifact is missing run_status provenance.")
-    scores = scores[scores["run_status"].astype(str).str.lower() == "success"].copy()
-    if "feature_source" in scores.columns:
-        scores = scores[scores["feature_source"].astype(str) == "esm1v_zero_shot_llr"].copy()
+    required_score_columns = {"score", "run_status", "feature_source", "model_name", "scoring_method"}
+    missing_score_columns = required_score_columns.difference(scores.columns)
+    if missing_score_columns:
+        raise ValueError(
+            f"ESM-1v score artifact lacks provenance columns: {sorted(missing_score_columns)}"
+        )
+    scores = scores[
+        (scores["run_status"].astype(str).str.lower() == "success")
+        & (scores["feature_source"].astype(str) == "esm1v_zero_shot_llr")
+        & (scores["model_name"].astype(str) == str(candidate_rules["esm1v_model_id"]))
+        & (scores["scoring_method"].astype(str) == str(candidate_rules["esm1v_scoring_method"]))
+    ].copy()
+    if scores.empty:
+        raise ValueError("No successful ESM-1v scores match the configured real model/scoring method.")
 
     eval_id_set = set(unc["variant_id"])
     if eval_id_set != eval_ids:
@@ -175,8 +197,10 @@ def build_role1_candidate_gate(
     output = annotate_candidate_gate(candidate, decision)
     output["pipeline_split_version"] = str(manifest.get("version", "unknown"))
     output["candidate_pool_role"] = "held_out_multi_mutant"
-    output["esm1v_model_id"] = "facebook/esm1v_t33_650M_UR90S_1"
-    output["esm2_embedding_model_id"] = "facebook/esm2_t12_35M_UR50D"
+    output["esm1v_model_id"] = str(candidate_rules["esm1v_model_id"])
+    output["esm2_embedding_model_id"] = str(candidate_rules["esm2_embedding_model_id"])
+    output["structural_risk_basis"] = "sequence_numbering_heuristic_not_3d"
+    output["role2_3d_geometry_check_required"] = True
     output["target_name"] = target_name
     output["parent_enzyme"] = enzyme
 
@@ -194,6 +218,9 @@ def build_role1_candidate_gate(
         "n_eligible_for_acquisition": int(output["role1_candidate_eligible"].sum()),
         "n_ineligible_for_acquisition": int((~output["role1_candidate_eligible"]).sum()),
         "n_chemistry_mapping_eligible": int(output["chemistry_mapping_eligible"].sum()),
+        "role2_3d_geometry_check_required": True,
+        "acquisition_policy_version": policy.get("schema_version"),
+        "diversity_fallback_policy": policy.get("diversity_fallback", {}),
         "gate_policy": decision.to_dict(),
         "input_artifacts": {
             "variants": str(variants_path),
