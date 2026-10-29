@@ -15,7 +15,6 @@ from typing import Any
 
 import numpy as np
 import pandas as pd
-from sklearn.preprocessing import normalize
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 SRC_DIR = REPO_ROOT / "src"
@@ -36,6 +35,8 @@ def _load_cached_embedding(index_row: pd.Series, index_root: Path) -> np.ndarray
     """Load a real ESM-2 embedding from its indexed cache path, with portable fallback."""
     raw_path = index_row.get("cache_path")
     cache_path = Path(str(raw_path)) if isinstance(raw_path, str) and raw_path else Path()
+    if not raw_path or not isinstance(raw_path, str) or not str(raw_path).strip():
+        cache_path = Path("__missing_embedding_cache__")
     if not cache_path.exists():
         model_id = str(index_row.get("model_id", "facebook/esm2_t12_35M_UR50D"))
         pooling = str(index_row.get("pooling_strategy", "mean"))
@@ -173,12 +174,18 @@ def apply_acquisition_ranking(
             if mapped.notna().all():
                 cost_score = mapped.to_numpy(dtype=np.float64)
                 out["compute_cost_score_source"] = tier_col
+    used_cost_source: str | None = None
     if cost_score is None:
         out["compute_cost_score_source"] = "unavailable_not_imputed"
         out["compute_cost_percentile_score"] = np.nan
         weights["cost"] = 0.0
     else:
         out["compute_cost_percentile_score"] = cost_score
+        used_cost_source = (
+            str(cost_col)
+            if cost_col is not None and np.isfinite(out[cost_col].to_numpy(dtype=np.float64)).all()
+            else str(tier_col)
+        )
 
     if uncertainty_enabled:
         # If any required uncertainty signal was unavailable, the code above fails closed.
@@ -209,14 +216,13 @@ def apply_acquisition_ranking(
     eligible_mask = out["role1_candidate_eligible"].astype(bool).to_numpy()
     acquisition_score[~eligible_mask] = np.nan
     out["acquisition_score"] = acquisition_score
-    out["acquisition_rank"] = pd.Series(acquisition_score).rank(
+    out["acquisition_rank"] = pd.Series(acquisition_score, index=out.index).rank(
         ascending=False, method="min", na_option="keep"
     ).astype("Int64")
+    out = out.sort_values("acquisition_rank", ascending=True, na_position="last").reset_index(drop=True)
     summary = {
         "acquisition_mode": mode,
-        "cost_estimate_source": cost_col or (
-            str(tier_col) if "tier_col" in locals() and cost_score is not None else "unavailable_not_imputed"
-        ),
+        "cost_estimate_source": used_cost_source or "unavailable_not_imputed",
         "configured_weights": weights,
         "effective_weights_after_missing_signal_renormalization": normalized_weights,
         "n_ranked_candidates": int(np.isfinite(acquisition_score).sum()),
@@ -291,7 +297,10 @@ def build_role1_candidate_gate(
         if "variant_id" not in frame.columns:
             raise ValueError(f"{name} artifact is missing variant_id.")
         frame["variant_id"] = frame["variant_id"].astype(str)
-    required_embedding_columns = {"variant_id", "model_id", "feature_source", "dimensions", "is_finite", "status", "sequence_hash"}
+    required_embedding_columns = {
+        "variant_id", "model_id", "feature_source", "dimensions", "is_finite",
+        "status", "sequence_hash", "cache_path", "pooling_strategy",
+    }
     missing_embedding_columns = required_embedding_columns.difference(embedding_index.columns)
     if missing_embedding_columns:
         raise ValueError(
@@ -408,6 +417,14 @@ def build_role1_candidate_gate(
     candidate["esm2_sequence_match"] = True
 
     output = annotate_candidate_gate(candidate, decision)
+    output, acquisition_summary = apply_acquisition_ranking(
+        candidates=output,
+        embedding_index=embedding_index,
+        train_ids=train_ids,
+        index_root=embedding_index_path.parent,
+        policy=policy,
+        uncertainty_enabled=decision.uncertainty_gating_enabled,
+    )
     output["pipeline_split_version"] = str(manifest.get("version", "unknown"))
     output["candidate_pool_role"] = "held_out_multi_mutant"
     output["esm1v_model_id"] = str(candidate_rules["esm1v_model_id"])
@@ -434,6 +451,7 @@ def build_role1_candidate_gate(
         "role2_3d_geometry_check_required": True,
         "acquisition_policy_version": policy.get("schema_version"),
         "diversity_fallback_policy": policy.get("diversity_fallback", {}),
+        "acquisition_ranking": acquisition_summary,
         "gate_policy": decision.to_dict(),
         "input_artifacts": {
             "variants": str(variants_path),
