@@ -118,3 +118,24 @@ def test_candidate_gate_rejects_duplicate_ids():
         assert "duplicate variant_id" in str(exc)
     else:
         raise AssertionError("Duplicate candidate IDs must be rejected.")
+
+
+
+def test_diversity_fallback_does_not_require_uncertainty_signal():
+    """When Gate 0 fails, absent uncertainty must not exclude an otherwise valid candidate."""
+    candidates = pd.DataFrame([{
+        "variant_id": "multi_without_uncertainty",
+        "is_multi_mutant": True,
+        "num_mutations": 2,
+        "is_duplicate": False,
+        "mutant_sequence": "ACDE",
+        "y_pred_xgb": 1.2,
+        "esm1v_delta_llr": -0.5,
+        "aggregate_uncertainty": np.nan,
+        "structure_mapping_status": "exact_1to1",
+    }])
+    decision = resolve_gate0_policy(_payload("FAIL", lower=-0.6, upper=-0.1))
+    output = annotate_candidate_gate(candidates, decision)
+    assert bool(output.loc[0, "role1_candidate_eligible"]) is True
+    assert bool(output.loc[0, "uncertainty_gating_enabled"]) is False
+    assert output.loc[0, "combined_gate_status"] == "ELIGIBLE_DIVERSITY_FALLBACK_PENDING_ROLE2_3D_GATE"
