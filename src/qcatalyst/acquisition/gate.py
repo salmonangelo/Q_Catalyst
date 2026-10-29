@@ -243,4 +243,24 @@ def annotate_candidate_gate(
     out["chemistry_mapping_eligible"] = chemistry_eligible
     out["role1_gate_policy_valid"] = decision.policy_valid
     out["role1_gate_rationale"] = decision.rationale
+
+    # This is an integrated Role 1 handoff status, not a final chemistry/quantum PASS.
+    integrated_status: list[str] = []
+    for role1_ok, mapping_ok in zip(eligible, chemistry_eligible):
+        if not role1_ok:
+            integrated_status.append("REJECT_ROLE1_INPUT_RULES")
+        elif not mapping_ok:
+            integrated_status.append("BLOCK_CHEMISTRY_PENDING_STRUCTURE_MAPPING")
+        elif decision.uncertainty_gating_enabled:
+            integrated_status.append("ELIGIBLE_UNCERTAINTY_MODE_PENDING_ROLE2_3D_GATE")
+        else:
+            integrated_status.append("ELIGIBLE_DIVERSITY_FALLBACK_PENDING_ROLE2_3D_GATE")
+    out["combined_gate_status"] = integrated_status
+    out["role2_3d_geometry_gate_status"] = "NOT_RUN_PENDING_ROLE2"
+    out["requires_role2_3d_geometry_check"] = True
+    fallback = policy["diversity_fallback"]
+    out["fallback_weight_sequence_diversity"] = float(fallback["sequence_embedding_diversity_weight"])
+    out["fallback_weight_predicted_activity"] = float(fallback["predicted_activity_weight"])
+    out["fallback_weight_compute_cost"] = float(fallback["estimated_compute_cost_weight"])
+    out["fallback_weight_uncertainty"] = float(fallback["uncertainty_weight"])
     return out
