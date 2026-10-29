@@ -83,7 +83,7 @@ def run_esm_scoring(
     print(f"Output predictions:   {output_path.resolve()}")
     print(f"Max variants to score: {max_variants} (home session compute limit)")
     print(f"Execution mode:        {'Mock (calibrated LLR proxy)' if mock else 'Real weights'}")
-    print("Network access:        None (zero downloads)")
+    print("Network access:        Cached model weights required; no silent mock fallback")
     print("-" * 70)
 
     if not input_path.exists():
@@ -145,7 +145,7 @@ def run_embedding_extraction(
     pooling: str = "mean",
     enzyme: str | None = None,
     max_variants: int = 20,
-    mock: bool = True,
+    mock: bool = False,
 ) -> int:
     """Extract ESM-2 sequence representations for a small batch of variants."""
     start_time = time.time()
@@ -395,7 +395,7 @@ def run_uncertainty_estimation(
     random_seed: int = 42,
     n_ensemble: int = 10,
     alpha: float = 0.10,
-    mock_embeddings: bool = True,
+    mock_embeddings: bool = False,
     split_version: str = "v2",
 ) -> int:
     """Execute Feature 6 uncertainty estimation pipeline with split-conformal calibration."""
@@ -715,7 +715,7 @@ def run_benchmarking(
     good_threshold: float = 1.0,
     random_seed: int = 42,
     n_bootstrap: int = 1000,
-    mock_esm: bool = True,
+    mock_esm: bool = False,
 ) -> int:
     """Run Feature 8 benchmarking suite across arms A0, A1, A2 on held-out split."""
     start_time = time.time()
