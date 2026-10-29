@@ -6,9 +6,9 @@ actual prediction errors on strictly held-out variants.
 Agreed Decision Rule:
 - Calculate Spearman rank correlation (rho) between uncertainty scores and absolute prediction errors.
 - Compute a bootstrap 95% confidence interval (B >= 1000) for rho.
-- If the 95% CI includes zero (CI_lower <= 0.0), Gate 0 FAILS its criterion and
-  Role 4 must use diversity-based selection instead of uncertainty-based gating.
-- If the 95% CI strictly excludes zero (CI_lower > 0.0), Gate 0 PASSES.
+- Gate 0 PASSES only if the 95% CI lower bound is strictly positive (CI_lower > 0.0).
+- A CI spanning zero is inconclusive and FAILS; a wholly negative CI indicates an inverse
+  relationship and also FAILS. Both require diversity-based selection.
 - AUROC for classifying the worst-error quartile (top 25% absolute error) is computed
   when labels support it, and explicitly marked undefined when single-class or insufficient.
 
@@ -282,8 +282,9 @@ def evaluate_gate0(
             )
 
     # 4. Gate 0 Decision Rule Application
-    # Rule: If the 95% confidence interval for the uncertainty/error correlation
-    # includes zero (ci_lower <= 0.0), Gate 0 FAILS its planned criterion.
+    # Rule: Gate 0 passes only if the confidence-interval lower bound is strictly positive.
+    # A CI spanning zero is inconclusive; a wholly negative CI is an inverse association.
+    # Both fail the pre-registered positive-association criterion.
     decision_rule = (
         f"Gate 0 PASSES if and only if the {int(ci_level * 100)}% bootstrap confidence interval "
         f"for Spearman correlation between uncertainty and absolute error has a strictly positive "
@@ -298,9 +299,9 @@ def evaluate_gate0(
         recommended_action = "PROCEED_WITH_UNCERTAINTY_GATING"
         rationale = (
             f"The {int(ci_level * 100)}% bootstrap CI for Spearman rho [{ci_lower:.4f}, {ci_upper:.4f}] "
-            f"is strictly positive and excludes zero (p={p_val:.2e}). Uncertainty scores reliably "
-            f"monotonically correlate with absolute prediction errors on held-out variants. "
-            f"Role 4 is authorized to apply uncertainty gating."
+            f"is strictly positive (p={p_val:.2e}), providing evidence of a positive uncertainty/error "
+            f"association on this held-out sample. This does not establish prospective calibration. "
+            f"Role 4 is authorized to apply uncertainty gating subject to the frozen downstream policy."
         )
     else:
         gate_passed = False
