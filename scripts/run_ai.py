@@ -101,8 +101,11 @@ def run_esm_scoring(
         print("No variants match filter criteria.", file=sys.stderr)
         return 1
 
+    # Avoid repeated inference for duplicate dataset rows; preserve one record per stable variant ID.
+    if "variant_id" in df.columns:
+        df = df.drop_duplicates(subset=["variant_id"], keep="first").copy()
     subset_df = df.head(max_variants)
-    print(f"Scoring batch of {len(subset_df)} variants...")
+    print(f"Scoring batch of {len(subset_df)} unique variants...")
 
     config = ESMScorerConfig(
         model_name="facebook/esm1v_t33_650M_UR90S_1",
@@ -166,8 +169,12 @@ def run_embedding_extraction(
     if enzyme:
         df = df[df["parent_enzyme"].str.lower() == enzyme.lower()]
 
+    # The curated table can contain repeated source records for one variant.
+    # Cache/inference work is keyed by unique variant ID to keep this batch reproducible.
+    if "variant_id" in df.columns:
+        df = df.drop_duplicates(subset=["variant_id"], keep="first").copy()
     subset_df = df.head(max_variants)
-    print(f"Processing batch of {len(subset_df)} sequences...")
+    print(f"Processing batch of {len(subset_df)} unique sequences...")
 
     config = ESM2EmbedderConfig(
         model_id=model_id,
