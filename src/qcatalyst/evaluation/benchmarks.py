@@ -63,12 +63,16 @@ def score_arm_a0_random(
     random_seed: int = 42,
     n_permutations: int = 20,
 ) -> np.ndarray:
-    """Generate averaged random rank scores across multiple random seeds for baseline A0."""
+    """Generate one reproducible random ordering for baseline A0.
+
+    For a Monte Carlo random baseline, average metric values across independently
+    generated permutations; do not average per-item scores before ranking.
+    """
+    # A single reproducible random permutation gives an actual random ranking.
+    # Averaging random scores per item makes scores nearly tied and is not the same
+    # as averaging the evaluation metrics over independent random rankings.
     rng = np.random.default_rng(random_seed)
-    scores = np.zeros(n_samples, dtype=np.float64)
-    for _ in range(n_permutations):
-        scores += rng.uniform(0.0, 1.0, size=n_samples)
-    return scores / n_permutations
+    return rng.permutation(n_samples).astype(np.float64)
 
 
 def score_arm_a1_esm1v(
@@ -79,8 +83,8 @@ def score_arm_a1_esm1v(
     """Score variants using ESM-1v zero-shot mutation-effect model for baseline A1."""
     if not mock:
         for candidate_path in [
-            Path("results/predictions/real_esm1v_scores.parquet"),
             Path("results/predictions/esm1v_scores.parquet"),
+            Path("results/predictions/real_esm1v_scores.parquet"),
         ]:
             if candidate_path.exists():
                 try:
@@ -91,9 +95,19 @@ def score_arm_a1_esm1v(
                         and "run_status" in cached_df.columns
                     ):
                         cached_real = cached_df[cached_df["run_status"] == "success"]
-                        id_map = dict(zip(cached_real["variant_id"], cached_real["score"]))
-                        if all(vid in id_map for vid in variants_df["variant_id"]):
-                            return variants_df["variant_id"].map(id_map).to_numpy(dtype=np.float64)
+                        if "feature_source" in cached_real.columns:
+                            cached_real = cached_real[
+                                cached_real["feature_source"].astype(str) == "esm1v_zero_shot_llr"
+                            ]
+                        if "model_name" in cached_real.columns:
+                            cached_real = cached_real[
+                                cached_real["model_name"].astype(str)
+                                == "facebook/esm1v_t33_650M_UR90S_1"
+                            ]
+                        id_map = dict(zip(cached_real["variant_id"].astype(str), cached_real["score"]))
+                        requested_ids = variants_df["variant_id"].astype(str)
+                        if all(vid in id_map for vid in requested_ids):
+                            return requested_ids.map(id_map).to_numpy(dtype=np.float64)
                 except Exception:
                     pass
 
@@ -170,6 +184,42 @@ def run_benchmark_suite(
     if test_u.empty:
         raise ValueError("No held-out evaluation variants found matching criteria.")
 
+    # Arm A2 must use the separately trained supervised predictor output.
+    # The ensemble mean in the uncertainty table is not interchangeable with y_pred_xgb.
+    if not predictions_path.exists():
+        raise FileNotFoundError(f"Supervised predictions table not found at {predictions_path}")
+    prediction_df = pd.read_parquet(predictions_path)
+    required_prediction_cols = {"variant_id", "parent_enzyme", "target_name", "split_role", "y_pred_xgb", "y_true"}
+    missing_prediction_cols = required_prediction_cols.difference(prediction_df.columns)
+    if missing_prediction_cols:
+        raise ValueError(f"Predictions table missing required columns: {sorted(missing_prediction_cols)}")
+    a2_predictions = prediction_df[
+        (prediction_df["parent_enzyme"].str.lower() == enzyme.lower())
+        & (prediction_df["target_name"].str.lower() == target_name.lower())
+        & (prediction_df["split_role"] == "held_out_test")
+    ][["variant_id", "y_pred_xgb", "y_true"]].copy()
+    if a2_predictions["variant_id"].duplicated().any():
+        raise ValueError("Duplicate held-out variant IDs in supervised predictions table.")
+    if test_u["variant_id"].duplicated().any():
+        raise ValueError("Duplicate held-out variant IDs in uncertainty table.")
+    test_u = test_u.merge(
+        a2_predictions.rename(columns={"y_true": "prediction_y_true"}),
+        on="variant_id",
+        how="left",
+        validate="one_to_one",
+    )
+    if test_u["y_pred_xgb"].isna().any():
+        missing_ids = test_u.loc[test_u["y_pred_xgb"].isna(), "variant_id"].astype(str).tolist()
+        raise ValueError(f"Missing supervised XGBoost predictions for held-out variants: {missing_ids[:5]}")
+    if not np.allclose(
+        test_u["y_true"].to_numpy(dtype=np.float64),
+        test_u["prediction_y_true"].to_numpy(dtype=np.float64),
+        rtol=1e-7,
+        atol=1e-9,
+    ):
+        raise ValueError("Ground-truth labels differ between uncertainty and supervised prediction artifacts.")
+    test_u = test_u.drop(columns=["prediction_y_true"])
+
     n_eval = len(test_u)
     y_true = test_u["y_true"].to_numpy(dtype=np.float64)
     base_rate = float(np.mean(y_true > good_threshold))
@@ -218,7 +268,7 @@ def run_benchmark_suite(
                 random_seed=random_seed,
                 compute_cost_cpu_seconds=round(cost_a0, 4),
                 status="evaluated",
-                provenance="Averaged uniform random permutations (seeds 42..62)",
+                provenance="Single uniform random permutation (fixed seed); bootstrap CI over held-out variants",
             ).to_dict()
         )
 
@@ -232,11 +282,21 @@ def run_benchmark_suite(
     metrics_a1 = evaluate_all_ranking_metrics(
         y_true, scores_a1, threshold=good_threshold, n_bootstrap=n_bootstrap, seed=random_seed
     )
+    a1_name = (
+        "ESM-1v Zero-Shot Ranking"
+        if not mock_esm
+        else "MOCK BLOSUM62 Proxy (not ESM-1v)"
+    )
+    a1_provenance = (
+        "Real ESM-1v masked-marginal LLR; checkpoint facebook/esm1v_t33_650M_UR90S_1"
+        if not mock_esm
+        else "MOCK synthetic BLOSUM62 log-odds proxy; must not be interpreted as ESM-1v or used for scientific conclusions"
+    )
     for m_name, m_dict in metrics_a1.items():
         records.append(
             BenchmarkRecord(
                 arm_id="A1",
-                arm_name="ESM-1v Zero-Shot Ranking",
+                arm_name=a1_name,
                 target_name=target_name,
                 parent_enzyme=enzyme,
                 split_id="single_to_multi",
@@ -254,7 +314,7 @@ def run_benchmark_suite(
                 random_seed=random_seed,
                 compute_cost_cpu_seconds=round(cost_a1, 4),
                 status="evaluated",
-                provenance="ESM-1v masked marginal log-likelihood ratio (t33_650M_UR90S_1)",
+                provenance=a1_provenance,
             ).to_dict()
         )
 
@@ -262,7 +322,7 @@ def run_benchmark_suite(
     # Arm A2: Supervised XGBoost + Structural Features
     # -------------------------------------------------------------
     t2 = time.time()
-    pred_xgb = test_u["y_pred_mean"].to_numpy(dtype=np.float64)
+    pred_xgb = test_u["y_pred_xgb"].to_numpy(dtype=np.float64)
     struct_risk = test_u["u_structural_risk"].to_numpy(dtype=np.float64)
     scores_a2 = score_arm_a2_xgboost_structural(pred_xgb, struct_risk)
     cost_a2 = time.time() - t2
