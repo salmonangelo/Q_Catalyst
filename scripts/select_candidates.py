@@ -15,6 +15,7 @@ from typing import Any
 
 import numpy as np
 import pandas as pd
+from sklearn.preprocessing import normalize
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 SRC_DIR = REPO_ROOT / "src"
@@ -29,6 +30,204 @@ from qcatalyst.acquisition.gate import (
     resolve_gate0_policy,
 )
 from qcatalyst.protein_ai.embeddings import compute_sequence_hash
+
+
+def _load_cached_embedding(index_row: pd.Series, index_root: Path) -> np.ndarray:
+    """Load a real ESM-2 embedding from its indexed cache path, with portable fallback."""
+    raw_path = index_row.get("cache_path")
+    cache_path = Path(str(raw_path)) if isinstance(raw_path, str) and raw_path else Path()
+    if not cache_path.exists():
+        model_id = str(index_row.get("model_id", "facebook/esm2_t12_35M_UR50D"))
+        pooling = str(index_row.get("pooling_strategy", "mean"))
+        seq_hash = str(index_row.get("sequence_hash", ""))
+        model_dir = index_root / f"real_{model_id.replace('/', '_').replace(chr(92), '_')}"
+        cache_path = model_dir / f"{seq_hash}_{pooling}.npz"
+    if not cache_path.exists():
+        raise FileNotFoundError(
+            f"Real ESM-2 embedding cache missing for variant {index_row.get('variant_id')}: {cache_path}"
+        )
+    try:
+        with np.load(cache_path, allow_pickle=False) as data:
+            vector = np.asarray(data["embedding"], dtype=np.float32)
+            source = str(data["feature_source"].item()) if "feature_source" in data else "unknown"
+    except Exception as exc:
+        raise ValueError(f"Cannot read ESM-2 embedding cache {cache_path}: {exc}") from exc
+    if source != "real_esm2_35M":
+        raise ValueError(f"Embedding cache is not genuine ESM-2 output: {cache_path} ({source})")
+    if vector.shape != (480,) or not np.isfinite(vector).all():
+        raise ValueError(f"Embedding vector must be finite with 480 dimensions: {cache_path}")
+    return vector
+
+
+def _percentile_score(values: np.ndarray, higher_is_better: bool = True) -> np.ndarray:
+    """Map a vector to stable [0, 1] percentile scores; tied values remain tied."""
+    series = pd.Series(np.asarray(values, dtype=np.float64))
+    ranks = series.rank(method="average", pct=True).to_numpy(dtype=np.float64)
+    return ranks if higher_is_better else 1.0 - ranks
+
+
+def apply_acquisition_ranking(
+    candidates: pd.DataFrame,
+    embedding_index: pd.DataFrame,
+    train_ids: set[str],
+    index_root: Path,
+    policy: dict[str, Any],
+    uncertainty_enabled: bool,
+) -> tuple[pd.DataFrame, dict[str, Any]]:
+    """Compute the config-defined acquisition score without fabricated missing-cost values.
+
+    Diversity is cosine distance to the nearest single-site training embedding, converted
+    to a candidate-pool percentile. Predicted activity and (when available) chemistry-cost
+    estimates are also converted to percentiles. Missing cost estimates cause the configured
+    cost weight to be removed and the remaining available weights to be renormalized.
+    """
+    out = candidates.copy()
+    if not train_ids:
+        raise ValueError("Acquisition ranking requires non-empty single-site training IDs.")
+    if not {"variant_id", "cache_path", "sequence_hash"}.issubset(embedding_index.columns):
+        raise ValueError("Embedding index lacks cache_path, sequence_hash, or variant_id.")
+    idx = embedding_index.copy()
+    idx["variant_id"] = idx["variant_id"].astype(str)
+    idx = idx.set_index("variant_id", drop=False)
+    missing_train = sorted(train_ids - set(idx.index))
+    missing_candidates = sorted(set(out["variant_id"].astype(str)) - set(idx.index))
+    if missing_train or missing_candidates:
+        raise ValueError(
+            f"Embedding index does not cover ranking pool: missing_train={missing_train[:5]}, "
+            f"missing_candidates={missing_candidates[:5]}"
+        )
+
+    train_vectors = np.vstack([
+        _load_cached_embedding(idx.loc[variant_id], index_root)
+        for variant_id in sorted(train_ids)
+    ]).astype(np.float64)
+    candidate_vectors = np.vstack([
+        _load_cached_embedding(idx.loc[variant_id], index_root)
+        for variant_id in out["variant_id"].astype(str)
+    ]).astype(np.float64)
+    train_norms = np.linalg.norm(train_vectors, axis=1, keepdims=True)
+    candidate_norms = np.linalg.norm(candidate_vectors, axis=1, keepdims=True)
+    if np.any(train_norms == 0.0) or np.any(candidate_norms == 0.0):
+        raise ValueError("ESM-2 embeddings must have non-zero norm to compute cosine diversity.")
+    train_unit = train_vectors / train_norms
+    candidate_unit = candidate_vectors / candidate_norms
+    nearest_similarity = np.max(candidate_unit @ train_unit.T, axis=1)
+    raw_diversity = np.clip(1.0 - nearest_similarity, 0.0, 2.0)
+    diversity_score = _percentile_score(raw_diversity, higher_is_better=True)
+    out["nearest_train_cosine_distance"] = raw_diversity
+    out["diversity_percentile_score"] = diversity_score
+
+    activity_col = "y_pred_mean" if "y_pred_mean" in out.columns else "y_pred_xgb"
+    if activity_col not in out.columns:
+        raise ValueError("Candidates lack y_pred_mean/y_pred_xgb for acquisition activity score.")
+    activity_values = out[activity_col].to_numpy(dtype=np.float64)
+    if not np.isfinite(activity_values).all():
+        raise ValueError(f"{activity_col} contains non-finite values; cannot rank candidates.")
+    activity_score = _percentile_score(activity_values, higher_is_better=True)
+    out["activity_score_source"] = activity_col
+    out["predicted_activity_percentile_score"] = activity_score
+
+    if uncertainty_enabled:
+        uncertainty_cfg = policy["uncertainty_guided"]
+        raw_uncertainty = out["aggregate_uncertainty"].to_numpy(dtype=np.float64)
+        if not np.isfinite(raw_uncertainty).all():
+            raise ValueError("Gate 0 passed but aggregate_uncertainty contains missing/non-finite values.")
+        uncertainty_score = _percentile_score(raw_uncertainty, higher_is_better=True)
+        out["uncertainty_value_percentile_score"] = uncertainty_score
+        weights = {
+            "diversity": float(uncertainty_cfg["sequence_embedding_diversity_weight"]),
+            "activity": float(uncertainty_cfg["predicted_activity_weight"]),
+            "uncertainty": float(uncertainty_cfg["uncertainty_weight"]),
+            "cost": float(uncertainty_cfg["estimated_compute_cost_weight"]),
+        }
+        mode = "uncertainty_guided_allowed"
+    else:
+        fallback_cfg = policy["diversity_fallback"]
+        out["uncertainty_value_percentile_score"] = np.nan
+        weights = {
+            "diversity": float(fallback_cfg["sequence_embedding_diversity_weight"]),
+            "activity": float(fallback_cfg["predicted_activity_weight"]),
+            "uncertainty": 0.0,
+            "cost": float(fallback_cfg["estimated_compute_cost_weight"]),
+        }
+        mode = "diversity_fallback"
+
+    # Only use explicit computed cost fields; do not infer expensive chemistry from mutation count.
+    cost_col = next((
+        col for col in (
+            "compute_cost_cpu_seconds", "estimated_compute_cost_seconds", "estimated_chemistry_cost"
+        ) if col in out.columns
+    ), None)
+    cost_score: np.ndarray | None = None
+    if cost_col is not None:
+        cost_values = out[cost_col].to_numpy(dtype=np.float64)
+        if np.isfinite(cost_values).all():
+            cost_score = _percentile_score(cost_values, higher_is_better=False)
+            out["compute_cost_score_source"] = cost_col
+    if cost_score is None:
+        # Support explicit Tier S/Tier M estimates where no runtime numeric is available.
+        tier_col = next((col for col in ("compute_cost_tier", "chemistry_tier", "cluster_tier") if col in out.columns), None)
+        if tier_col is not None:
+            tiers = out[tier_col].astype(str).str.upper()
+            mapped = tiers.map({"TIER S": 1.0, "S": 1.0, "TIER M": 0.0, "M": 0.0})
+            if mapped.notna().all():
+                cost_score = mapped.to_numpy(dtype=np.float64)
+                out["compute_cost_score_source"] = tier_col
+    if cost_score is None:
+        out["compute_cost_score_source"] = "unavailable_not_imputed"
+        out["compute_cost_percentile_score"] = np.nan
+        weights["cost"] = 0.0
+    else:
+        out["compute_cost_percentile_score"] = cost_score
+
+    if uncertainty_enabled:
+        # If any required uncertainty signal was unavailable, the code above fails closed.
+        pass
+    else:
+        out["uncertainty_value_percentile_score"] = np.nan
+
+    score_components = {
+        "diversity": diversity_score,
+        "activity": activity_score,
+    }
+    active_weights = {
+        key: weight for key, weight in weights.items()
+        if weight > 0.0 and key in score_components | ({"uncertainty": uncertainty_score} if uncertainty_enabled else {})
+    }
+    if cost_score is not None and weights.get("cost", 0.0) > 0.0:
+        score_components["cost"] = cost_score
+    if uncertainty_enabled:
+        score_components["uncertainty"] = uncertainty_score
+
+    if not active_weights:
+        raise ValueError("Acquisition policy has no available positive-weight score components.")
+    weight_sum = sum(active_weights.values())
+    normalized_weights = {key: weight / weight_sum for key, weight in active_weights.items()}
+    acquisition_score = np.zeros(len(out), dtype=np.float64)
+    for component, weight in normalized_weights.items():
+        acquisition_score += weight * np.asarray(score_components[component], dtype=np.float64)
+    eligible_mask = out["role1_candidate_eligible"].astype(bool).to_numpy()
+    acquisition_score[~eligible_mask] = np.nan
+    out["acquisition_score"] = acquisition_score
+    out["acquisition_rank"] = pd.Series(acquisition_score).rank(
+        ascending=False, method="min", na_option="keep"
+    ).astype("Int64")
+    summary = {
+        "acquisition_mode": mode,
+        "cost_estimate_source": cost_col or (
+            str(tier_col) if "tier_col" in locals() and cost_score is not None else "unavailable_not_imputed"
+        ),
+        "configured_weights": weights,
+        "effective_weights_after_missing_signal_renormalization": normalized_weights,
+        "n_ranked_candidates": int(np.isfinite(acquisition_score).sum()),
+        "n_ineligible_candidates": int((~eligible_mask).sum()),
+        "diversity_definition": "1 - maximum cosine similarity to the single-site training embedding pool; percentile normalized",
+        "activity_definition": f"percentile of {activity_col}; higher is better",
+        "cost_definition": "inverse percentile of measured/runtime tier estimate when present; otherwise omitted and remaining weights renormalized",
+        "uncertainty_definition": "uncertainty percentile contributes only when Gate 0 passes; disabled after Gate 0 failure",
+        "science_note": "Ranking is computational prioritisation only; no wet-lab outcome is implied.",
+    }
+    return out, summary
 
 
 def build_role1_candidate_gate(
