@@ -153,3 +153,30 @@ def test_aggregate_uncertainty_handling():
     u_none, status_none = compute_aggregate_uncertainty(None, None, None)
     assert u_none is None
     assert status_none == "all_signals_missing"
+
+
+
+def test_conformal_small_calibration_set_refuses_nominal_90_percent_claim():
+    """For alpha=.1, fewer than 9 calibration residuals cannot yield the finite split-conformal quantile."""
+    y_cal = np.linspace(1.0, 2.0, 8)
+    y_pred_cal = y_cal + np.linspace(-0.2, 0.2, 8)
+    calibrator = SplitConformalCalibrator(alpha=0.10)
+    calibrator.calibrate(y_cal, y_pred_cal)
+
+    assert calibrator.is_calibrated is False
+    assert calibrator.threshold_q is None
+    result = calibrator.predict_intervals(np.array([1.5]))
+    assert result.calibration_status == "insufficient_calibration_data"
+    assert np.isnan(result.lower_bounds[0])
+    assert np.isnan(result.upper_bounds[0])
+
+
+def test_conformal_minimum_finite_quantile_sample_size():
+    """At n=9, the 90% split-conformal threshold is finite and calibration can proceed."""
+    y_cal = np.linspace(1.0, 2.0, 9)
+    y_pred_cal = y_cal + np.linspace(-0.2, 0.2, 9)
+    calibrator = SplitConformalCalibrator(alpha=0.10)
+    calibrator.calibrate(y_cal, y_pred_cal)
+    assert calibrator.is_calibrated is True
+    assert calibrator.threshold_q is not None
+    assert np.isfinite(calibrator.threshold_q)
