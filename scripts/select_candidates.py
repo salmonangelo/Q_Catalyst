@@ -31,6 +31,7 @@ def build_role1_candidate_gate(
     predictions_path: Path,
     uncertainty_path: Path,
     esm1v_scores_path: Path,
+    embedding_index_path: Path,
     gate0_verdict_path: Path,
     split_manifest_path: Path,
     output_path: Path,
@@ -41,7 +42,7 @@ def build_role1_candidate_gate(
     """Join v2 held-out predictions and return a machine-readable policy summary."""
     required_files = [
         variants_path, predictions_path, uncertainty_path, esm1v_scores_path,
-        gate0_verdict_path, split_manifest_path,
+        embedding_index_path, gate0_verdict_path, split_manifest_path,
     ]
     missing = [str(p) for p in required_files if not p.exists()]
     if missing:
@@ -51,6 +52,7 @@ def build_role1_candidate_gate(
     predictions = pd.read_parquet(predictions_path)
     uncertainty = pd.read_parquet(uncertainty_path)
     esm1v = pd.read_parquet(esm1v_scores_path)
+    embedding_index = pd.read_parquet(embedding_index_path)
     manifest = json.loads(split_manifest_path.read_text(encoding="utf-8"))
 
     train_ids = set(map(str, manifest.get("train_variant_ids", [])))
@@ -83,6 +85,22 @@ def build_role1_candidate_gate(
         if "variant_id" not in frame.columns:
             raise ValueError(f"{name} artifact is missing variant_id.")
         frame["variant_id"] = frame["variant_id"].astype(str)
+    required_embedding_columns = {"variant_id", "feature_source", "dimensions", "is_finite", "status", "sequence_hash"}
+    missing_embedding_columns = required_embedding_columns.difference(embedding_index.columns)
+    if missing_embedding_columns:
+        raise ValueError(
+            f"ESM-2 embedding index lacks provenance columns: {sorted(missing_embedding_columns)}"
+        )
+    embedding_index = embedding_index.copy()
+    embedding_index["variant_id"] = embedding_index["variant_id"].astype(str)
+    if embedding_index["variant_id"].duplicated().any():
+        raise ValueError("ESM-2 embedding index contains duplicate variant IDs.")
+    if not (embedding_index["feature_source"].astype(str) == "real_esm2_35M").all():
+        raise ValueError("ESM-2 embedding index contains mock or unexpected embedding provenance.")
+    if not (embedding_index["dimensions"].astype(int) == 480).all():
+        raise ValueError("ESM-2 embedding index has dimensions other than 480.")
+    if not embedding_index["is_finite"].astype(bool).all():
+        raise ValueError("ESM-2 embedding index includes non-finite embeddings.")
     if pred["variant_id"].duplicated().any():
         raise ValueError("Supervised prediction artifact has duplicate held-out variant IDs.")
     if unc["variant_id"].duplicated().any():
@@ -107,6 +125,9 @@ def build_role1_candidate_gate(
         )
     if eval_id_set.intersection(train_ids):
         raise ValueError("Leakage check failed: held-out artifact contains a training variant ID.")
+    missing_embeddings = sorted(eval_ids - set(embedding_index["variant_id"]))
+    if missing_embeddings:
+        raise ValueError(f"Held-out variants missing real ESM-2 embeddings: {missing_embeddings[:5]}")
 
     candidate = variants[variants["variant_id"].isin(eval_ids)].copy()
     if set(candidate["variant_id"]) != eval_ids:
@@ -124,6 +145,19 @@ def build_role1_candidate_gate(
         scores[["variant_id", "score", "run_status"]].rename(
             columns={"score": "esm1v_delta_llr", "run_status": "esm1v_run_status"}
         ),
+        on="variant_id", how="left", validate="one_to_one",
+    )
+    embedding_cols = [
+        "variant_id", "sequence_hash", "dimensions", "feature_source", "status", "is_finite"
+    ]
+    candidate = candidate.merge(
+        embedding_index[embedding_cols].rename(columns={
+            "sequence_hash": "esm2_sequence_hash",
+            "dimensions": "esm2_embedding_dimensions",
+            "feature_source": "esm2_feature_source",
+            "status": "esm2_embedding_status",
+            "is_finite": "esm2_embedding_finite",
+        }),
         on="variant_id", how="left", validate="one_to_one",
     )
 
@@ -166,6 +200,7 @@ def build_role1_candidate_gate(
             "predictions": str(predictions_path),
             "uncertainty": str(uncertainty_path),
             "esm1v_scores": str(esm1v_scores_path),
+            "embedding_index": str(embedding_index_path),
             "gate0_verdict": str(gate0_verdict_path),
             "split_manifest": str(split_manifest_path),
         },
@@ -186,6 +221,7 @@ def main() -> int:
     parser.add_argument("--predictions", type=Path, default=REPO_ROOT / "results/predictions/predictions.parquet")
     parser.add_argument("--uncertainty", type=Path, default=REPO_ROOT / "results/uncertainty/uncertainty.parquet")
     parser.add_argument("--esm1v-scores", type=Path, default=REPO_ROOT / "results/predictions/esm1v_scores.parquet")
+    parser.add_argument("--embedding-index", type=Path, default=REPO_ROOT / "results/embeddings/embedding_index.parquet")
     parser.add_argument("--gate0-verdict", type=Path, default=REPO_ROOT / "reports/tables/gate0_verdict.json")
     parser.add_argument("--split-manifest", type=Path, default=REPO_ROOT / "data/splits/ispetase_activity_single_to_multi_v2.json")
     parser.add_argument("--output", type=Path, default=REPO_ROOT / "results/rankings/role1_candidate_gate.parquet")
@@ -199,6 +235,7 @@ def main() -> int:
         predictions_path=args.predictions,
         uncertainty_path=args.uncertainty,
         esm1v_scores_path=args.esm1v_scores,
+        embedding_index_path=args.embedding_index,
         gate0_verdict_path=args.gate0_verdict,
         split_manifest_path=args.split_manifest,
         output_path=args.output,
