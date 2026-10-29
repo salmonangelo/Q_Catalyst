@@ -465,7 +465,11 @@ def run_uncertainty_estimation(
     pred_cal_mean, _, _ = ensemble.predict(X_cal)
     calibrator = SplitConformalCalibrator(alpha=alpha)
     calibrator.calibrate(y_cal, pred_cal_mean)
-    print(f"  Conformal quantile threshold q = {calibrator.threshold_q:.4f}")
+    print(
+        "  Conformal quantile threshold q = "
+        f"{calibrator.threshold_q:.4f}" if calibrator.threshold_q is not None
+        else "  Conformal quantile threshold q = N/A (insufficient calibration data)"
+    )
 
     # 5. Fit OOD detector on X_fit
     ood_detector = OODDetector()
@@ -562,7 +566,7 @@ def run_uncertainty_estimation(
         f"- **Ensemble Architecture:** {n_ensemble} bootstrap XGBoost predictors",
         f"- **Calibration Scheme:** Split-conformal regression on independent single-site holdout (N={len(cal_df)})",
         f"- **Target Coverage:** {int((1.0 - alpha) * 100)}% (alpha = {alpha})",
-        f"- **Conformal Quantile Threshold ($q$):** {calibrator.threshold_q:.4f}",
+        f"- **Conformal Quantile Threshold ($q$):** {calibrator.threshold_q:.4f}" if calibrator.threshold_q is not None else "- **Conformal Quantile Threshold ($q$):** N/A (insufficient calibration data)",
         f"- **Held-Out Empirical Coverage:** **{test_coverage_val * 100:.1f}%**",
         "",
         "## 2. Uncertainty Signals Summary (Held-Out Test Set)",
@@ -690,7 +694,13 @@ def run_gate0_validation(
     print(f"Evaluated Held-Out Variants: {result.n_held_out}")
     print(f"Spearman rho:                {result.spearman_rho:.4f} (p = {result.spearman_pvalue:.2e})")
     print(f"Bootstrap 95% CI:            [{result.ci_lower:.4f}, {result.ci_upper:.4f}]")
-    print(f"CI Includes Zero:            {'YES (Failed planned criterion)' if result.ci_includes_zero else 'NO (Statistically robust correlation)'}")
+    if result.ci_includes_zero:
+        ci_interpretation = "YES (inconclusive; Gate 0 fails)"
+    elif result.ci_upper < 0.0:
+        ci_interpretation = "NO (inverse association; Gate 0 fails)"
+    else:
+        ci_interpretation = "NO (positive interval; Gate 0 passes)"
+    print(f"CI Spans Zero:               {ci_interpretation}")
     auc_display = f"{result.auroc:.4f}" if result.auroc is not None else "Undefined"
     print(f"Worst Quartile AUROC:        {auc_display} ({result.auroc_status})")
     print("-" * 70)
