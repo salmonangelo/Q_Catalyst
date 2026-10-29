@@ -71,7 +71,7 @@ def run_esm_scoring(
     output_path: Path,
     enzyme: str | None = None,
     max_variants: int = 20,
-    mock: bool = True,
+    mock: bool = False,
     cache_dir: Path | None = None,
 ) -> int:
     """Score a selected subset of variants using ESM-1v."""
@@ -218,7 +218,7 @@ def run_supervised_training(
     target_name: str = "activity",
     enzyme: str = "IsPETase",
     random_seed: int = 42,
-    mock_embeddings: bool = True,
+    mock_embeddings: bool = False,
     split_version: str = "v2",
 ) -> int:
     """Train XGBoost model and Ridge comparison baseline and evaluate on held-out split."""
