@@ -5,7 +5,7 @@ Provides sequence representation extraction with:
 - Mean, BOS, and per-residue pooling strategies.
 - Hash-based caching (.npz) by sequence SHA256 and model ID.
 - Tabular embedding index tracking dimensions, cache paths, and status.
-- Calibrated deterministic offline mock embedder for safe home execution.
+- Explicit, deterministic offline mock mode for unit tests only.
 """
 
 from __future__ import annotations
@@ -60,7 +60,7 @@ class ESM2EmbedderConfig:
     cache_dir: str | Path = "results/embeddings"
     weights_cache_dir: str | Path | None = None
     device: str = "cpu"
-    mock: bool = True  # Safe home testing default
+    mock: bool = False  # Real pretrained inference by default; tests must explicitly request mock=True
     batch_size: int = 4
     expected_dim: int | None = None
 
