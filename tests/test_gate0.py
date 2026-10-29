@@ -246,3 +246,15 @@ def test_gate0_entirely_negative_ci_is_fail_but_does_not_span_zero():
     assert result.gate_passed is False
     assert result.verdict == "FAIL"
     assert result.recommended_action == "FALLBACK_TO_DIVERSITY_SELECTION"
+
+
+
+def test_gate0_requires_held_out_split_provenance():
+    """Gate 0 must not infer held-out status when the input has no split_role column."""
+    df = pd.DataFrame({
+        "y_true": [1.0, 2.0, 3.0, 4.0],
+        "y_pred_mean": [1.1, 1.9, 2.8, 4.2],
+        "aggregate_uncertainty": [0.1, 0.2, 0.3, 0.4],
+    })
+    with pytest.raises(ValueError, match="split_role provenance"):
+        evaluate_gate0(df, n_bootstrap=100)
