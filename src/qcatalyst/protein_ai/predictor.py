@@ -295,6 +295,23 @@ def create_frozen_split(
         train_df = shuffled.iloc[:n_train].copy()
         eval_df = shuffled.iloc[n_train:].copy()
 
+    train_ids = set(train_df["variant_id"].astype(str))
+    eval_ids = set(eval_df["variant_id"].astype(str))
+    id_overlap = train_ids.intersection(eval_ids)
+    train_sequences = (
+        set(train_df["mutant_sequence"].dropna().astype(str))
+        if "mutant_sequence" in train_df.columns else set()
+    )
+    eval_sequences = (
+        set(eval_df["mutant_sequence"].dropna().astype(str))
+        if "mutant_sequence" in eval_df.columns else set()
+    )
+    sequence_overlap = train_sequences.intersection(eval_sequences)
+    if version == "v2" and (id_overlap or sequence_overlap):
+        raise ValueError(
+            f"DATA LEAKAGE DETECTED: IDs={len(id_overlap)}, sequences={len(sequence_overlap)}"
+        )
+
     split_manifest = {
         "version": version,
         "split_strategy": split_strategy,
@@ -302,8 +319,13 @@ def create_frozen_split(
         "total_records": len(train_df) + len(eval_df),
         "n_train": len(train_df),
         "n_eval": len(eval_df),
-        "train_variant_ids": train_df["variant_id"].tolist(),
-        "eval_variant_ids": eval_df["variant_id"].tolist(),
+        "train_variant_ids": train_df["variant_id"].astype(str).tolist(),
+        "eval_variant_ids": eval_df["variant_id"].astype(str).tolist(),
+        "validation_checks": {
+            "id_overlap_count": len(id_overlap),
+            "sequence_overlap_count": len(sequence_overlap),
+            "leakage_free": len(id_overlap) == 0 and len(sequence_overlap) == 0,
+        },
     }
 
     return train_df, eval_df, split_manifest
