@@ -170,6 +170,42 @@ def run_benchmark_suite(
     if test_u.empty:
         raise ValueError("No held-out evaluation variants found matching criteria.")
 
+    # Arm A2 must use the separately trained supervised predictor output.
+    # The ensemble mean in the uncertainty table is not interchangeable with y_pred_xgb.
+    if not predictions_path.exists():
+        raise FileNotFoundError(f"Supervised predictions table not found at {predictions_path}")
+    prediction_df = pd.read_parquet(predictions_path)
+    required_prediction_cols = {"variant_id", "parent_enzyme", "target_name", "split_role", "y_pred_xgb", "y_true"}
+    missing_prediction_cols = required_prediction_cols.difference(prediction_df.columns)
+    if missing_prediction_cols:
+        raise ValueError(f"Predictions table missing required columns: {sorted(missing_prediction_cols)}")
+    a2_predictions = prediction_df[
+        (prediction_df["parent_enzyme"].str.lower() == enzyme.lower())
+        & (prediction_df["target_name"].str.lower() == target_name.lower())
+        & (prediction_df["split_role"] == "held_out_test")
+    ][["variant_id", "y_pred_xgb", "y_true"]].copy()
+    if a2_predictions["variant_id"].duplicated().any():
+        raise ValueError("Duplicate held-out variant IDs in supervised predictions table.")
+    if test_u["variant_id"].duplicated().any():
+        raise ValueError("Duplicate held-out variant IDs in uncertainty table.")
+    test_u = test_u.merge(
+        a2_predictions.rename(columns={"y_true": "prediction_y_true"}),
+        on="variant_id",
+        how="left",
+        validate="one_to_one",
+    )
+    if test_u["y_pred_xgb"].isna().any():
+        missing_ids = test_u.loc[test_u["y_pred_xgb"].isna(), "variant_id"].astype(str).tolist()
+        raise ValueError(f"Missing supervised XGBoost predictions for held-out variants: {missing_ids[:5]}")
+    if not np.allclose(
+        test_u["y_true"].to_numpy(dtype=np.float64),
+        test_u["prediction_y_true"].to_numpy(dtype=np.float64),
+        rtol=1e-7,
+        atol=1e-9,
+    ):
+        raise ValueError("Ground-truth labels differ between uncertainty and supervised prediction artifacts.")
+    test_u = test_u.drop(columns=["prediction_y_true"])
+
     n_eval = len(test_u)
     y_true = test_u["y_true"].to_numpy(dtype=np.float64)
     base_rate = float(np.mean(y_true > good_threshold))
@@ -262,7 +298,7 @@ def run_benchmark_suite(
     # Arm A2: Supervised XGBoost + Structural Features
     # -------------------------------------------------------------
     t2 = time.time()
-    pred_xgb = test_u["y_pred_mean"].to_numpy(dtype=np.float64)
+    pred_xgb = test_u["y_pred_xgb"].to_numpy(dtype=np.float64)
     struct_risk = test_u["u_structural_risk"].to_numpy(dtype=np.float64)
     scores_a2 = score_arm_a2_xgboost_structural(pred_xgb, struct_risk)
     cost_a2 = time.time() - t2
