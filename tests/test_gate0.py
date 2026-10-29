@@ -201,20 +201,20 @@ def test_gate0_artifacts_export_and_plot(tmp_path: Path):
 
 
 def test_gate0_real_dataset_integrity():
-    """Verify Gate 0 execution on actual project held-out evaluation table."""
+    """Gate verdict and action must be consistent with the computed CI on v2 held-out data."""
     uncertainty_path = Path("results/uncertainty/uncertainty.parquet")
     if not uncertainty_path.exists():
         pytest.skip("results/uncertainty/uncertainty.parquet not found.")
 
     df = pd.read_parquet(uncertainty_path)
     test_df = df[df["split_role"] == "held_out_test"]
-    # Under corrected leakage-free split v2, N=65; under legacy contaminated v1, N=149
-    assert len(test_df) in (65, 149)
+    assert len(test_df) == 65, f"Expected v2 held-out multi-mutants (N=65), got {len(test_df)}"
 
     result = evaluate_gate0(test_df, n_bootstrap=1000, seed=42)
 
-    assert result.n_held_out == len(test_df)
+    assert result.n_held_out == 65
     assert np.isfinite(result.spearman_rho)
+<<<<<<< HEAD
     if len(test_df) == 65:
         # Honest evaluation on genuine held-out multi-mutants correctly triggers fallback
         assert result.verdict in ("PASS", "FAIL")
@@ -227,3 +227,49 @@ def test_gate0_real_dataset_integrity():
         assert result.recommended_action == "PROCEED_WITH_UNCERTAINTY_GATING"
     assert result.auroc is not None
     assert result.auroc_status == "valid"
+=======
+    assert result.gate_passed is (result.ci_lower > 0.0)
+    assert result.verdict == ("PASS" if result.ci_lower > 0.0 else "FAIL")
+    assert result.recommended_action == (
+        "PROCEED_WITH_UNCERTAINTY_GATING"
+        if result.ci_lower > 0.0
+        else "FALLBACK_TO_DIVERSITY_SELECTION"
+    )
+    assert result.ci_includes_zero is (result.ci_lower <= 0.0 <= result.ci_upper)
+    if result.auroc_status == "valid":
+        assert result.auroc is not None
+        assert 0.0 <= result.auroc <= 1.0
+
+
+def test_gate0_entirely_negative_ci_is_fail_but_does_not_span_zero():
+    """An entirely negative CI is not mislabeled as spanning zero, but must fail Gate 0."""
+    x = np.linspace(0.0, 1.0, 120)
+    y = -x + np.random.default_rng(7).normal(0, 0.015, 120)
+    df = pd.DataFrame({
+        "y_true": np.abs(y) + 1.0,
+        "y_pred_mean": np.ones_like(y),
+        "aggregate_uncertainty": x,
+        "split_role": ["held_out_test"] * len(x),
+    })
+    # Here the absolute-error response needs to be inversely ordered with x.
+    # Construct it explicitly to avoid any ambiguity due to taking abs(y_true - y_pred).
+    df["y_true"] = 1.0 + (1.0 - x) + np.random.default_rng(8).normal(0, 0.005, len(x))
+    result = evaluate_gate0(df, n_bootstrap=600, seed=11)
+    assert result.ci_upper < 0.0
+    assert result.ci_includes_zero is False
+    assert result.gate_passed is False
+    assert result.verdict == "FAIL"
+    assert result.recommended_action == "FALLBACK_TO_DIVERSITY_SELECTION"
+
+
+
+def test_gate0_requires_held_out_split_provenance():
+    """Gate 0 must not infer held-out status when the input has no split_role column."""
+    df = pd.DataFrame({
+        "y_true": [1.0, 2.0, 3.0, 4.0],
+        "y_pred_mean": [1.1, 1.9, 2.8, 4.2],
+        "aggregate_uncertainty": [0.1, 0.2, 0.3, 0.4],
+    })
+    with pytest.raises(ValueError, match="split_role provenance"):
+        evaluate_gate0(df, n_bootstrap=100)
+>>>>>>> 316719bff4cf12d478d19c6b7916dc0a5fb46591
