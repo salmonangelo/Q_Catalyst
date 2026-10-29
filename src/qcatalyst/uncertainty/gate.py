@@ -144,8 +144,9 @@ def compute_spearman_bootstrap_ci(
     ci_lower = float(np.percentile(boot_rhos, lower_pct))
     ci_upper = float(np.percentile(boot_rhos, upper_pct))
 
-    # Interval includes zero if lower <= 0 <= upper or if lower <= 0
-    ci_includes_zero = bool(ci_lower <= 0.0)
+    # This flag describes interval geometry only. Gate pass/fail separately requires
+    # a strictly positive lower bound; an entirely negative interval is a fail too.
+    ci_includes_zero = bool(ci_lower <= 0.0 <= ci_upper)
 
     return rho, p_val, ci_lower, ci_upper, ci_includes_zero
 
@@ -284,9 +285,10 @@ def evaluate_gate0(
     # includes zero (ci_lower <= 0.0), Gate 0 FAILS its planned criterion.
     decision_rule = (
         f"Gate 0 PASSES if and only if the {int(ci_level * 100)}% bootstrap confidence interval "
-        f"for Spearman correlation between uncertainty and absolute error strictly excludes zero "
-        f"(CI_lower > 0.0). If CI_lower <= 0.0, Gate 0 FAILS and Role 4 must use diversity-based "
-        f"selection instead of uncertainty-based gating."
+        f"for Spearman correlation between uncertainty and absolute error has a strictly positive "
+        f"lower bound (CI_lower > 0.0). An interval spanning zero is inconclusive; an interval "
+        f"entirely below zero indicates an inverse relationship. Both cases FAIL the pre-registered "
+        f"positive-association criterion, so Role 4 must use diversity-based selection."
     )
 
     if ci_lower > 0.0:
@@ -303,11 +305,20 @@ def evaluate_gate0(
         gate_passed = False
         verdict = "FAIL"
         recommended_action = "FALLBACK_TO_DIVERSITY_SELECTION"
+        if ci_upper < 0.0:
+            failure_detail = (
+                "The confidence interval is entirely below zero, indicating an inverse association: "
+                "higher uncertainty scores are associated with lower absolute errors in this evaluation."
+            )
+        else:
+            failure_detail = (
+                "The confidence interval spans zero or has a non-positive lower bound, so the required "
+                "positive association has not been established."
+            )
         rationale = (
             f"The {int(ci_level * 100)}% bootstrap CI for Spearman rho [{ci_lower:.4f}, {ci_upper:.4f}] "
-            f"includes zero or is non-positive. Uncertainty scores do not demonstrate statistically "
-            f"robust rank-ordering of prediction errors on held-out variants. Honest failure reported: "
-            f"Role 4 must proceed with diversity-based variant selection rather than uncertainty filtering."
+            f"does not satisfy the pre-registered positive-association criterion. {failure_detail} "
+            f"Honest failure reported: Role 4 must use diversity-based selection rather than uncertainty filtering."
         )
 
     return Gate0Result(
@@ -562,7 +573,7 @@ def generate_gate0_coverage_plot(
         f"Validation Criterion:      Spearman 95% CI > 0.0\n"
         f"Spearman rho:              {rho_val:.4f} (p = {p_val:.2e})\n"
         f"Bootstrap 95% CI:          {ci_txt}\n"
-        f"CI Includes Zero:          {'Yes' if (result and result.ci_includes_zero) else 'No'}\n"
+        f"CI Spans Zero:          {'Yes' if (result and result.ci_includes_zero) else 'No'}\n"
         f"Worst Quartile AUROC:      {auc_str}\n"
         f"Conformal Coverage:        {cov_rate:.1f}% (Nominal: 90%)\n"
         f"--------------------------------------------------\n"
@@ -639,13 +650,13 @@ def save_gate0_artifacts(
         "## 1. Statistical Results (Primary Uncertainty: Aggregate U(x))",
         f"- **Spearman Rank Correlation:** $\\rho = {result.spearman_rho:.4f}$ ($p = {result.spearman_pvalue:.2e}$)",
         f"- **Bootstrap {int(result.ci_level * 100)}% Confidence Interval ($B={result.n_bootstrap}$):** `[{result.ci_lower:.4f}, {result.ci_upper:.4f}]`",
-        f"- **Confidence Interval Includes Zero:** `{'Yes' if result.ci_includes_zero else 'No'}`",
+        f"- **Confidence Interval Spans Zero:** `{'Yes' if result.ci_includes_zero else 'No'}`",
         f"- **Worst-Error Quartile Threshold (75th Percentile):** $\\ge {result.worst_error_quartile_threshold:.4f}$",
         f"- **Worst-Error Quartile Count:** {result.worst_error_quartile_count} variants",
         f"- **Worst-Error Quartile AUROC:** `{result.auroc:.4f}` (Status: `{result.auroc_status}`)",
         "",
         "## 2. Component-by-Component Diagnostic Breakdown",
-        "| Uncertainty Signal | Spearman $\\rho$ | $p$-value | 95% Bootstrap CI | Includes Zero? | Worst-Quartile AUROC | AUROC Status |",
+        "| Uncertainty Signal | Spearman $\\rho$ | $p$-value | 95% Bootstrap CI | Spans Zero? | Worst-Quartile AUROC | AUROC Status |",
         "|---|---|---|---|---|---|---|",
     ]
 
@@ -663,11 +674,11 @@ def save_gate0_artifacts(
         result.rationale,
         "",
         "### Key Takeaways for Variant Prioritization:",
-        f"1. **Primary Uncertainty Metric:** Aggregate uncertainty $U(x)$ shows statistically significant rank correlation with actual prediction error ($\\rho = {result.spearman_rho:.4f}$, 95% CI $[{result.ci_lower:.4f}, {result.ci_upper:.4f}]$), demonstrating genuine predictive error-awareness.",
-        f"2. **Component Dynamics:** ESM-2 embedding distance is the primary driver of out-of-distribution error awareness ($\\rho = 0.4355$), whereas raw bootstrap ensemble variance alone has a wider CI ($[-0.12, 0.22]$). Integrating both signals provides superior calibration.",
-        "3. **Conformal Coverage:** Held-out empirical coverage matches/exceeds nominal coverage, verifying valid prediction bounds without empirical under-coverage.",
+        f"1. **Primary Uncertainty Metric:** Aggregate uncertainty $U(x)$ has Spearman $\\rho={result.spearman_rho:.4f}$ with absolute error and 95% CI $[{result.ci_lower:.4f}, {result.ci_upper:.4f}]$. Gate 0 requires a strictly positive CI lower bound; the observed result is therefore {'consistent with passing the criterion' if result.gate_passed else 'a failure of the pre-registered criterion'}.",
+        "2. **Component Diagnostics:** Component correlations are descriptive diagnostics on this evaluation set; they do not establish that any component is calibrated for future variants.",
+        "3. **Conformal Interpretation:** Report empirical coverage together with interval width. Coverage on a combinatorial held-out set does not by itself prove useful or distribution-free calibration when calibration and test variants differ in mutational depth.",
         "",
-        "## 4. Integrity and Non-Exaggeration Statement",
+                "## 4. Integrity and Non-Exaggeration Statement",
         f"> [!IMPORTANT]\n> {result.disclaimer}",
     ])
 
