@@ -35,6 +35,15 @@ diversity_fallback:
   uncertainty_weight: 0.00
   uncertainty_enabled_after_gate0_fail: false
 
+uncertainty_guided:
+  # Explicit configurable heuristic used only if Gate 0 passes.
+  # Higher calibrated uncertainty is treated as value-of-information for exploration.
+  sequence_embedding_diversity_weight: 0.25
+  predicted_activity_weight: 0.35
+  uncertainty_weight: 0.25
+  estimated_compute_cost_weight: 0.15
+  require_finite_uncertainty: true
+
 scientific_limits:
   structural_mapping_is_not_3d_proximity: true
   require_role2_geometry_check_before_chemistry: true
