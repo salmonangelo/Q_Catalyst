@@ -92,6 +92,13 @@ def main() -> int:
     enzyme_df = df[df["parent_enzyme"].astype(str).str.lower() == args.enzyme.lower()]
     if enzyme_df.empty:
         parser.error(f"No records found for parent enzyme {args.enzyme!r}.")
+    unique_pool_size = int(enzyme_df["variant_id"].nunique())
+    if args.max_variants < unique_pool_size:
+        parser.error(
+            f"Complete pipeline requires all {unique_pool_size} unique {args.enzyme} variants, "
+            f"but --max-variants={args.max_variants}. Use scripts/run_ai.py --mock for a smoke test "
+            "or omit --max-variants to run the complete scientific pipeline."
+        )
 
     run_started = datetime.now(timezone.utc).isoformat()
     stage_records: list[dict] = []
@@ -276,6 +283,7 @@ def main() -> int:
                     predictions_path=predictions,
                     uncertainty_path=uncertainty_activity,
                     esm1v_scores_path=esm1v_scores,
+                    embedding_index_path=esm2_output / "embedding_index.parquet",
                     gate0_verdict_path=REPO_ROOT / "reports" / "tables" / "gate0_verdict.json",
                     split_manifest_path=REPO_ROOT / "data" / "splits" / f"{args.enzyme.lower()}_activity_single_to_multi_v2.json",
                     output_path=results / "rankings" / "role1_candidate_gate.parquet",
