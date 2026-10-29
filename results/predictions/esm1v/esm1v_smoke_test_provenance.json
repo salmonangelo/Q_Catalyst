@@ -1,0 +1,12 @@
+{
+  "model_name": "facebook/esm1v_t33_650M_UR90S_1",
+  "checkpoint_revision": "8bfdb1892536cc77bd0760b9c25ddced2cd0b4c8",
+  "load_time_seconds": 11.672,
+  "wt_score": 0.0,
+  "n37p_score": -3.7184,
+  "s290p_score": -0.576,
+  "multi_mutant_score": -4.2944,
+  "is_deterministic": true,
+  "device": "cpu",
+  "timestamp": "2026-10-29T17:19:40Z"
+}

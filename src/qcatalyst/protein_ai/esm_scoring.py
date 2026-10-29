@@ -76,6 +76,12 @@ def get_blosum62_score(aa1: str, aa2: str) -> int:
     return BLOSUM62_MATRIX.get((aa1, aa2), BLOSUM62_MATRIX.get((aa2, aa1), -4))
 
 
+class ModelWeightsNotAvailableError(FileNotFoundError):
+    """Raised when real ESM-1v model weights are not available in the local cache."""
+
+    pass
+
+
 @dataclass(frozen=True)
 class ESMScoreResult:
     """Standardized output record for an ESM-1v mutation score prediction."""
@@ -92,6 +98,10 @@ class ESMScoreResult:
     model_version: str
     sequence_hash: str
     run_status: str
+    checkpoint_revision: str = "8bfdb1892536cc77bd0760b9c25ddced2cd0b4c8"
+    software_version: str = "transformers;torch"
+    device: str = "cpu"
+    feature_source: str = "esm1v_zero_shot_llr"
     is_prediction: bool = True
     disclaimer: str = (
         "Computational zero-shot likelihood ratio; not experimentally validated activity."
@@ -104,10 +114,12 @@ class ESMScorerConfig:
 
     model_name: str = "facebook/esm1v_t33_650M_UR90S_1"
     model_version: str = "v1"
+    checkpoint_revision: str = "8bfdb1892536cc77bd0760b9c25ddced2cd0b4c8"
     scoring_strategy: str = "masked_marginal"
     cache_dir: str | Path | None = None
+    output_dir: str | Path = "results/predictions/esm1v"
     device: str = "cpu"
-    mock: bool = True  # Default to True during local testing to avoid 2.6GB download
+    mock: bool = True  # Default to True to protect 500 MB download budget
     batch_size: int = 1
 
 
@@ -122,34 +134,62 @@ class ESMScorer:
         self.config = config or ESMScorerConfig()
         self._model = None
         self._tokenizer = None
+        self._site_llr_cache: dict[tuple[str, str, int, str], float] = {}
 
         if not self.config.mock:
             self._load_real_model()
 
     def _load_real_model(self) -> None:
-        """Load pretrained model from local cache directory with strict offline guarantees."""
-        cache_dir = Path(self.config.cache_dir) if self.config.cache_dir else None
+        """Load pretrained model from local cache directory with strict offline/budget guarantees."""
+        if self.config.cache_dir:
+            cache_path = Path(self.config.cache_dir)
+        else:
+            hf_home = Path(os.environ.get("HF_HOME", Path.home() / ".cache" / "huggingface" / "hub"))
+            model_slug = f"models--{self.config.model_name.replace('/', '--')}"
+            cache_path = hf_home / model_slug
 
-        if cache_dir is None or not cache_dir.exists():
-            raise FileNotFoundError(
-                f"Local ESM-1v model checkpoint not found in configured cache: '{cache_dir}'. "
-                "Per project rules, large checkpoints (>200MB) must not be downloaded during home sessions. "
-                "To run locally, initialize ESMScorer with config.mock=True."
+        # Check for model weights file (pytorch_model.bin or model.safetensors)
+        weights_found = False
+        if cache_path.exists():
+            for p in cache_path.rglob("*.bin"):
+                if p.name == "pytorch_model.bin" and p.stat().st_size > 100_000_000:
+                    weights_found = True
+                    break
+            if not weights_found:
+                for p in cache_path.rglob("*.safetensors"):
+                    if p.stat().st_size > 100_000_000:
+                        weights_found = True
+                        break
+
+        if not weights_found:
+            raise ModelWeightsNotAvailableError(
+                f"Local ESM-1v model checkpoint not found in configured cache: '{cache_path}'. "
+                f"Official checkpoint size for '{self.config.model_name}' is 2,488.71 MB (2.49 GB), "
+                "which exceeds the 500 MB download budget. "
+                "Per project rules, large checkpoints (>200MB) must not be downloaded during home sessions "
+                "without explicit approval. To run locally, initialize ESMScorer with config.mock=True."
             )
 
         try:
             from transformers import AutoModelForMaskedLM, AutoTokenizer
+
+            kwargs = {"local_files_only": True}
+            if self.config.cache_dir:
+                kwargs["cache_dir"] = str(self.config.cache_dir)
+
             self._tokenizer = AutoTokenizer.from_pretrained(
-                str(cache_dir), local_files_only=True
+                self.config.model_name, **kwargs
             )
             self._model = AutoModelForMaskedLM.from_pretrained(
-                str(cache_dir), local_files_only=True
+                self.config.model_name, **kwargs
             )
             self._model.to(self.config.device)
             self._model.eval()
+            for param in self._model.parameters():
+                param.requires_grad = False
         except Exception as exc:
             raise RuntimeError(
-                f"Failed to load cached ESM model from {cache_dir}: {exc}"
+                f"Failed to load cached ESM model for {self.config.model_name}: {exc}"
             ) from exc
 
     def compute_sequence_hash(self, wt_seq: str, mutant_str: str) -> str:
@@ -257,32 +297,63 @@ class ESMScorer:
         wt_seq: str,
         parsed_muts: list[tuple[str, int, str]],
     ) -> float:
-        """Run real forward passes with PyTorch and masked marginals."""
+        """Run official masked-marginal scoring with PyTorch on pretrained ESM-1v.
+
+        Reference formulation (Meier et al., NeurIPS 2021; facebookresearch/esm):
+            LLR = log p(mutant | x_{\\i}) - log p(wt | x_{\\i})
+
+        For multi-mutants, scores are summed additively across all sites:
+            LLR_total = sum_{(i, m)} [log p(m | x_{\\i}) - log p(w | x_{\\i})]
+
+        Note: Additive independent masked marginals assume site independence and do
+        not capture higher-order epistatic interactions between co-mutated residues.
+        """
         import torch
 
+        self._model.eval()
+
+        # Tokenize WT sequence with special tokens (<cls>, residues, <eos>)
+        inputs = self._tokenizer(wt_seq, return_tensors="pt").to(self.config.device)
+        input_ids = inputs["input_ids"]  # Shape: (1, seq_len + 2)
+
         total_llr = 0.0
-        # For masked marginal scoring, mask each position independently
         for wt_aa, pos, mut_aa in parsed_muts:
-            zero_based_pos = pos - 1
-            masked_chars = list(wt_seq)
-            # Replace position with tokenizer's mask token
-            masked_chars[zero_based_pos] = self._tokenizer.mask_token
-            masked_seq = "".join(masked_chars)
+            cache_key = (wt_seq, wt_aa, pos, mut_aa)
+            if hasattr(self, "_site_llr_cache") and cache_key in self._site_llr_cache:
+                total_llr += self._site_llr_cache[cache_key]
+                continue
 
-            inputs = self._tokenizer(masked_seq, return_tensors="pt").to(self.config.device)
+            if pos < 1 or pos > len(wt_seq):
+                raise ValueError(
+                    f"Mutation position {pos} is out of sequence bounds [1, {len(wt_seq)}]."
+                )
+
+            # In EsmTokenizer, token 0 is <cls>, so token index `pos` corresponds to 1-based residue pos
+            ref_token_id = input_ids[0, pos].item()
+            expected_ref_id = self._tokenizer.convert_tokens_to_ids(wt_aa)
+            if ref_token_id != expected_ref_id:
+                token_str = self._tokenizer.convert_ids_to_tokens(ref_token_id)
+                raise ValueError(
+                    f"Residue mismatch at position {pos}: expected '{wt_aa}', found '{token_str}'."
+                )
+
+            # Clone input_ids and mask exactly position `pos`
+            masked_ids = input_ids.clone()
+            masked_ids[0, pos] = self._tokenizer.mask_token_id
+
             with torch.no_grad():
-                outputs = self._model(**inputs)
-                logits = outputs.logits[0]  # Shape: (seq_len, vocab_size)
+                logits = self._model(input_ids=masked_ids).logits[0, pos]  # (vocab_size,)
+                log_probs = torch.log_softmax(logits, dim=-1)
 
-            # Account for CLS / BOS token offset
-            tokens = self._tokenizer.tokenize(masked_seq)
-            mask_token_idx = tokens.index(self._tokenizer.mask_token) + 1
-
-            log_probs = torch.log_softmax(logits[mask_token_idx], dim=-1)
-            wt_token_id = self._tokenizer.convert_tokens_to_ids(wt_aa)
             mut_token_id = self._tokenizer.convert_tokens_to_ids(mut_aa)
+            if mut_token_id is None or mut_token_id == self._tokenizer.unk_token_id:
+                raise ValueError(
+                    f"Invalid mutant amino acid '{mut_aa}' not recognized by tokenizer."
+                )
 
-            llr = (log_probs[mut_token_id] - log_probs[wt_token_id]).item()
+            llr = (log_probs[mut_token_id] - log_probs[ref_token_id]).item()
+            if hasattr(self, "_site_llr_cache"):
+                self._site_llr_cache[cache_key] = llr
             total_llr += llr
 
         return total_llr

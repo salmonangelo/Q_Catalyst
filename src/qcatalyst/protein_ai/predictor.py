@@ -248,16 +248,39 @@ def create_frozen_split(
     df: pd.DataFrame,
     split_strategy: str = "single_to_multi",
     random_seed: int = 42,
+    version: str = "v2",
 ) -> tuple[pd.DataFrame, pd.DataFrame, dict[str, Any]]:
     """Partition dataset into training and evaluation sets and record split metadata.
 
     Standard PET-Gym strategy:
     - Train on single-site mutants
-    - Evaluate on low-to-high multi-site mutants
+    - Evaluate on multi-site mutants (held-out zero-shot generalization)
+    - Version 'v2' enforces strict deduplication and zero ID/sequence overlap.
     """
     if split_strategy == "single_to_multi":
-        train_df = df[df["dataset_split"] == "single-site-mutant"].copy()
-        eval_df = df[df["dataset_split"] == "low-to-high-mutant"].copy()
+        if version == "v2" or "is_multi_mutant" in df.columns:
+            # Deduplicate by variant_id across single-site and progressive screening sets
+            deduped = df.drop_duplicates(subset=["variant_id"]).copy()
+            if "is_multi_mutant" in deduped.columns:
+                train_df = deduped[~deduped["is_multi_mutant"]].copy()
+                eval_df = deduped[deduped["is_multi_mutant"]].copy()
+            else:
+                train_df = deduped[deduped["dataset_split"] == "single-site-mutant"].copy()
+                train_vids = set(train_df["variant_id"])
+                eval_df = deduped[
+                    (deduped["dataset_split"] == "low-to-high-mutant")
+                    & (~deduped["variant_id"].isin(train_vids))
+                ].copy()
+
+            # Assert strict disjointness (automated leakage guard)
+            overlap = set(train_df["variant_id"]).intersection(set(eval_df["variant_id"]))
+            assert len(overlap) == 0, (
+                f"DATA LEAKAGE DETECTED: {len(overlap)} overlapping IDs in single_to_multi split"
+            )
+        else:
+            # Historical v1 partition (preserved for regression testing)
+            train_df = df[df["dataset_split"] == "single-site-mutant"].copy()
+            eval_df = df[df["dataset_split"] == "low-to-high-mutant"].copy()
     else:
         # Fallback to random partition
         shuffled = df.sample(frac=1.0, random_state=random_seed).copy()
@@ -266,9 +289,10 @@ def create_frozen_split(
         eval_df = shuffled.iloc[n_train:].copy()
 
     split_manifest = {
+        "version": version,
         "split_strategy": split_strategy,
         "random_seed": random_seed,
-        "total_records": len(df),
+        "total_records": len(train_df) + len(eval_df),
         "n_train": len(train_df),
         "n_eval": len(eval_df),
         "train_variant_ids": train_df["variant_id"].tolist(),

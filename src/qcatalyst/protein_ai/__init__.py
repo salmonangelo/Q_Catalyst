@@ -12,6 +12,7 @@ from qcatalyst.protein_ai.esm_scoring import (
     ESMScoreResult,
     ESMScorer,
     ESMScorerConfig,
+    ModelWeightsNotAvailableError,
     save_esm_predictions,
 )
 from qcatalyst.protein_ai.predictor import (
@@ -27,6 +28,7 @@ __all__ = [
     "ESMScorer",
     "ESMScorerConfig",
     "ESMScoreResult",
+    "ModelWeightsNotAvailableError",
     "save_esm_predictions",
     # ESM-2 Embeddings
     "ESM2Embedder",

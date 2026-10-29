@@ -212,6 +212,7 @@ def run_supervised_training(
     enzyme: str = "IsPETase",
     random_seed: int = 42,
     mock_embeddings: bool = True,
+    split_version: str = "v2",
 ) -> int:
     """Train XGBoost model and Ridge comparison baseline and evaluate on held-out split."""
     start_time = time.time()
@@ -223,6 +224,7 @@ def run_supervised_training(
     print(f"Primary Model:     XGBoost (XGBRegressor)")
     print(f"Baseline Model:    Ridge Regression (alpha=1.0)")
     print(f"Split Strategy:    single_to_multi (train=single-site, held-out=multi-site)")
+    print(f"Split Version:     {split_version} (leakage-free single-to-multi partition)")
     print(f"Random Seed:       {random_seed}")
     print("-" * 70)
 
@@ -241,11 +243,12 @@ def run_supervised_training(
 
     # 1. Create and freeze data split
     train_df, eval_df, split_manifest = create_frozen_split(
-        eligible_df, split_strategy="single_to_multi", random_seed=random_seed
+        eligible_df, split_strategy="single_to_multi", random_seed=random_seed, version=split_version
     )
 
     splits_dir.mkdir(parents=True, exist_ok=True)
-    split_file = splits_dir / f"{enzyme.lower()}_{target_name}_single_to_multi.json"
+    suffix = f"_{split_version}" if split_version != "v1" else ""
+    split_file = splits_dir / f"{enzyme.lower()}_{target_name}_single_to_multi{suffix}.json"
     split_file.write_text(json.dumps(split_manifest, indent=2), encoding="utf-8")
 
     # 2. Extract / load embeddings
@@ -386,6 +389,7 @@ def run_uncertainty_estimation(
     n_ensemble: int = 10,
     alpha: float = 0.10,
     mock_embeddings: bool = True,
+    split_version: str = "v2",
 ) -> int:
     """Execute Feature 6 uncertainty estimation pipeline with split-conformal calibration."""
     start_time = time.time()
@@ -397,6 +401,7 @@ def run_uncertainty_estimation(
     print(f"Ensemble Members:     {n_ensemble} bootstrap XGBoost predictors")
     print(f"Target Coverage:      {int((1.0 - alpha) * 100)}% (alpha = {alpha})")
     print(f"Output Table:         {output_path.resolve()}")
+    print(f"Split Version:        {split_version} (leakage-free single-to-multi partition)")
     print("Data Leakage Rule:    Calibration done strictly on train split; test set preserved.")
     print("-" * 70)
 
@@ -413,9 +418,10 @@ def run_uncertainty_estimation(
         & (~df["is_duplicate"])
     ].copy()
 
-    # 1. Split into single-site (training pool) and low-to-high (held-out evaluation)
-    train_pool_df = eligible_df[eligible_df["dataset_split"] == "single-site-mutant"].copy()
-    test_df = eligible_df[eligible_df["dataset_split"] == "low-to-high-mutant"].copy()
+    # 1. Split into single-site (training pool) and multi-site (held-out evaluation)
+    train_pool_df, test_df, _ = create_frozen_split(
+        eligible_df, split_strategy="single_to_multi", random_seed=random_seed, version=split_version
+    )
 
     # Further partition train_pool into model-train (75%) and calibration (25%)
     # Guaranteed leakage-free: test set is untouched during calibration
@@ -846,6 +852,13 @@ def main() -> None:
         action="store_true",
         help="Attempt to load real weights from cache_dir instead of mock proxy",
     )
+    parser.add_argument(
+        "--split-version",
+        type=str,
+        default="v2",
+        choices=["v1", "v2"],
+        help="Split version: v2 (leakage-free, default) or v1 (historical contaminated)",
+    )
 
     args = parser.parse_args()
     mock = not args.use_cached_model
@@ -876,6 +889,7 @@ def main() -> None:
             target_name=args.target,
             enzyme=args.enzyme,
             mock_embeddings=mock,
+            split_version=args.split_version,
         )
     elif args.train_predictor:
         code = run_supervised_training(
@@ -887,6 +901,7 @@ def main() -> None:
             target_name=args.target,
             enzyme=args.enzyme,
             mock_embeddings=mock,
+            split_version=args.split_version,
         )
     elif args.extract_embeddings:
         code = run_embedding_extraction(

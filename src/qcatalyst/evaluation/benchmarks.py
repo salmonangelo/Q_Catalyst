@@ -77,6 +77,26 @@ def score_arm_a1_esm1v(
     cache_dir: Path | None = None,
 ) -> np.ndarray:
     """Score variants using ESM-1v zero-shot mutation-effect model for baseline A1."""
+    if not mock:
+        for candidate_path in [
+            Path("results/predictions/real_esm1v_scores.parquet"),
+            Path("results/predictions/esm1v_scores.parquet"),
+        ]:
+            if candidate_path.exists():
+                try:
+                    cached_df = pd.read_parquet(candidate_path)
+                    if (
+                        "variant_id" in cached_df.columns
+                        and "score" in cached_df.columns
+                        and "run_status" in cached_df.columns
+                    ):
+                        cached_real = cached_df[cached_df["run_status"] == "success"]
+                        id_map = dict(zip(cached_real["variant_id"], cached_real["score"]))
+                        if all(vid in id_map for vid in variants_df["variant_id"]):
+                            return variants_df["variant_id"].map(id_map).to_numpy(dtype=np.float64)
+                except Exception:
+                    pass
+
     config = ESMScorerConfig(
         model_name="facebook/esm1v_t33_650M_UR90S_1",
         model_version="v1",

@@ -1,8 +1,8 @@
 # Q-Catalyst Raw Data Audit & Manifest Report
 
 ## 1. Executive Summary
-- **Total Inventoried Files:** 51
-- **File Formats:** `.csv`: 14, `.fasta`: 14, `.pdb`: 13, ``: 3, `.py`: 3, `.md`: 2, `.toml`: 1, `.lock`: 1
+- **Total Inventoried Files:** 53
+- **File Formats:** `.csv`: 14, `.fasta`: 14, `.pdb`: 13, ``: 3, `.py`: 3, `.md`: 2, `.pyc`: 2, `.lock`: 1, `.toml`: 1
 - **Audited CSV Datasets:** 14 (14 valid, 0 error/empty)
 - **Total Measurement Records:** 1113
 - **Network Access:** None (100% local inspection, raw data strictly unmodified).

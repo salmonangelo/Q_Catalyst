@@ -50,3 +50,5 @@ petflow/petflow/PET-Gym/single-site-mutant/KubuPETase_Tm/KubuPETase_Tm.pdb,KubuP
 petflow/petflow/PET-Gym/single-site-mutant/MipaPETase_Tm/MipaPETase_Tm.csv,MipaPETase_Tm.csv,.csv,179,aa2c342bf01ac455e7f250d49542b2cc2aca6eb3d6fc03fb7143488e74b79153,single-site-mutant,MipaPETase,Tm,False
 petflow/petflow/PET-Gym/single-site-mutant/MipaPETase_Tm/MipaPETase_Tm.fasta,MipaPETase_Tm.fasta,.fasta,307,45eccbd0e28e449d488d9f9c105dc6369ddd4f53347197acd6ab3cda76a3a917,single-site-mutant,MipaPETase,Tm,False
 petflow/petflow/PET-Gym/single-site-mutant/MipaPETase_Tm/MipaPETase_Tm.pdb,MipaPETase_Tm.pdb,.pdb,178687,f6761c78508d587debc5f241cc33eb5465ea91340137dda11c727b3589b83850,single-site-mutant,MipaPETase,Tm,False
+petflow/petflow/__pycache__/ankh_mlp.cpython-313.pyc,ankh_mlp.cpython-313.pyc,.pyc,38382,2096e50f819199eedfb5d14c18d0507a3a066cec63bf92520bacf5360781a137,other,unknown,none,False
+petflow/petflow/__pycache__/test_ankh_mlp.cpython-313-pytest-9.0.3.pyc,test_ankh_mlp.cpython-313-pytest-9.0.3.pyc,.pyc,9068,18285265f2cc06ba95150bc6d6b26c02113591fbc42b968b2221f856bcebc91d,other,unknown,none,False
