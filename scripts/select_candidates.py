@@ -28,6 +28,7 @@ from qcatalyst.acquisition.gate import (
     load_acquisition_config,
     resolve_gate0_policy,
 )
+from qcatalyst.protein_ai.embeddings import compute_sequence_hash
 
 
 def build_role1_candidate_gate(
@@ -192,6 +193,17 @@ def build_role1_candidate_gate(
         raise ValueError(f"At least one held-out candidate lacks a real ESM-1v score: {bad[:5]}")
     if candidate["mutant_sequence"].isna().any():
         raise ValueError("At least one candidate lacks mutant_sequence.")
+    candidate["calculated_mutant_sequence_hash"] = candidate["mutant_sequence"].map(compute_sequence_hash)
+    sequence_hash_mismatch = candidate[
+        candidate["calculated_mutant_sequence_hash"] != candidate["esm2_sequence_hash"]
+    ]
+    if not sequence_hash_mismatch.empty:
+        bad = sequence_hash_mismatch["variant_id"].astype(str).tolist()
+        raise ValueError(
+            "ESM-2 embedding sequence hash does not match the curated mutant sequence for IDs: "
+            f"{bad[:5]}"
+        )
+    candidate["esm2_sequence_match"] = True
 
     decision = resolve_gate0_policy(gate0_verdict_path)
     output = annotate_candidate_gate(candidate, decision)
