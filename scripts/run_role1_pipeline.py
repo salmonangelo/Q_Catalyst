@@ -172,10 +172,20 @@ def main() -> int:
             scored["feature_source"].astype(str) == "esm1v_zero_shot_llr"
         ).all():
             raise RuntimeError("ESM-1v output feature_source does not identify genuine zero-shot LLR scores.")
-        if "model_name" in scored.columns and not (
+        if "model_name" not in scored.columns or not (
             scored["model_name"].astype(str) == "facebook/esm1v_t33_650M_UR90S_1"
         ).all():
-            raise RuntimeError("ESM-1v output contains an unexpected model identifier.")
+            raise RuntimeError("ESM-1v output lacks or contains an unexpected model identifier.")
+        if scored["variant_id"].astype(str).duplicated().any():
+            raise RuntimeError("ESM-1v score table contains duplicate variant IDs.")
+        expected_ids = set(enzyme_df["variant_id"].astype(str))
+        scored_ids = set(scored["variant_id"].astype(str))
+        if scored_ids != expected_ids:
+            raise RuntimeError(
+                f"ESM-1v output does not cover the complete variant pool: "
+                f"missing={sorted(expected_ids - scored_ids)[:5]}, "
+                f"unexpected={sorted(scored_ids - expected_ids)[:5]}"
+            )
         if not np.isfinite(scored["score"].to_numpy(dtype=float)).all():
             raise RuntimeError("ESM-1v score table contains non-finite scores.")
         embedding_index = pd.read_parquet(esm2_output / "embedding_index.parquet")
@@ -191,6 +201,13 @@ def main() -> int:
             raise RuntimeError("ESM-2 embedding index contains unexpected vector dimensions.")
         if not embedding_index["variant_id"].astype(str).is_unique:
             raise RuntimeError("ESM-2 embedding index has duplicate variant IDs.")
+        embedded_ids = set(embedding_index["variant_id"].astype(str))
+        if embedded_ids != expected_ids:
+            raise RuntimeError(
+                f"ESM-2 embedding index does not cover the complete variant pool: "
+                f"missing={sorted(expected_ids - embedded_ids)[:5]}, "
+                f"unexpected={sorted(embedded_ids - expected_ids)[:5]}"
+            )
         return 0
 
     try:
