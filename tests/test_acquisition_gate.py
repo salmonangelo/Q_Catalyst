@@ -4,7 +4,8 @@ import json
 import numpy as np
 import pandas as pd
 
-from qcatalyst.acquisition.gate import annotate_candidate_gate, resolve_gate0_policy
+from qcatalyst.acquisition.gate import annotate_candidate_gate, load_acquisition_config, resolve_gate0_policy
+from scripts.select_candidates import apply_acquisition_ranking
 
 
 def _payload(verdict="PASS", lower=0.12, upper=0.55):
@@ -139,3 +140,63 @@ def test_diversity_fallback_does_not_require_uncertainty_signal():
     assert bool(output.loc[0, "role1_candidate_eligible"]) is True
     assert bool(output.loc[0, "uncertainty_gating_enabled"]) is False
     assert output.loc[0, "combined_gate_status"] == "ELIGIBLE_DIVERSITY_FALLBACK_PENDING_ROLE2_3D_GATE"
+
+
+
+def test_diversity_fallback_computes_real_embedding_acquisition_ranking(tmp_path):
+    """Fallback score uses real 480-d embedding vectors and configured weights, with no fake cost."""
+    import numpy as np
+
+    train_ids = {"train_a", "train_b"}
+    candidate_ids = ["candidate_novel", "candidate_similar", "candidate_middle"]
+    vectors = {
+        "train_a": np.array([1.0, 0.0] + [0.0] * 478, dtype=np.float32),
+        "train_b": np.array([0.0, 1.0] + [0.0] * 478, dtype=np.float32),
+        "candidate_novel": np.array([0.0, 0.0, 1.0] + [0.0] * 477, dtype=np.float32),
+        "candidate_similar": np.array([1.0, 0.0] + [0.0] * 478, dtype=np.float32),
+        "candidate_middle": np.array([0.0, 0.8, 0.6] + [0.0] * 477, dtype=np.float32),
+    }
+    rows = []
+    for variant_id, vector in vectors.items():
+        cache_path = tmp_path / f"{variant_id}.npz"
+        np.savez_compressed(
+            cache_path,
+            embedding=vector,
+            feature_source=np.asarray("real_esm2_35M"),
+        )
+        rows.append({
+            "variant_id": variant_id,
+            "model_id": "facebook/esm2_t12_35M_UR50D",
+            "sequence_hash": variant_id,
+            "cache_path": str(cache_path),
+            "pooling_strategy": "mean",
+            "dimensions": 480,
+            "feature_source": "real_esm2_35M",
+            "is_finite": True,
+        })
+    candidates = pd.DataFrame([
+        {"variant_id": "candidate_novel", "y_pred_mean": 0.5, "role1_candidate_eligible": True,
+         "aggregate_uncertainty": np.nan},
+        {"variant_id": "candidate_similar", "y_pred_mean": 0.8, "role1_candidate_eligible": True,
+         "aggregate_uncertainty": np.nan},
+        {"variant_id": "candidate_middle", "y_pred_mean": 0.7, "role1_candidate_eligible": True,
+         "aggregate_uncertainty": np.nan},
+    ])
+    output, summary = apply_acquisition_ranking(
+        candidates=candidates,
+        embedding_index=pd.DataFrame(rows),
+        train_ids=train_ids,
+        index_root=tmp_path,
+        policy=load_acquisition_config(),
+        uncertainty_enabled=False,
+    )
+    assert summary["acquisition_mode"] == "diversity_fallback"
+    assert summary["n_ranked_candidates"] == 3
+    assert summary["cost_estimate_source"] == "unavailable_not_imputed"
+    assert summary["effective_weights_after_missing_signal_renormalization"] == {
+        "diversity": 0.5 / 0.85,
+        "activity": 0.35 / 0.85,
+    }
+    assert output["acquisition_rank"].tolist() == [1, 2, 3]
+    assert output.iloc[0]["variant_id"] == "candidate_novel"
+    assert output["uncertainty_value_percentile_score"].isna().all()
