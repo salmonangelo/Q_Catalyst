@@ -46,7 +46,7 @@ def load_acquisition_config(config_path: str | Path | None = None) -> dict[str, 
         raise ValueError(f"Cannot load acquisition policy at {config_path}: {exc}") from exc
     if not isinstance(payload, dict) or payload.get("schema_version") != 1:
         raise ValueError(f"Unsupported or malformed acquisition policy at {config_path}")
-    for required_section in ("gate0", "candidate_gate", "diversity_fallback", "scientific_limits"):
+    for required_section in ("gate0", "candidate_gate", "diversity_fallback", "uncertainty_guided", "scientific_limits"):
         if not isinstance(payload.get(required_section), dict):
             raise ValueError(f"Acquisition policy section {required_section!r} is missing or malformed")
     return payload
