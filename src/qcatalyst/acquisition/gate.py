@@ -217,7 +217,11 @@ def annotate_candidate_gate(
                     row_reasons.append("missing_or_nonfinite_real_esm1v_score")
             except (TypeError, ValueError):
                 row_reasons.append("missing_or_nonfinite_real_esm1v_score")
-        if bool(rules.get("require_finite_composite_uncertainty", True)):
+        # If Gate 0 failed (or failed closed), uncertainty is disabled and must
+        # not be used as an eligibility filter in diversity-fallback mode.
+        if decision.uncertainty_gating_enabled and bool(
+            rules.get("require_finite_composite_uncertainty", True)
+        ):
             try:
                 if not np.isfinite(float(row.get("aggregate_uncertainty", np.nan))):
                     row_reasons.append("missing_or_nonfinite_composite_uncertainty")
