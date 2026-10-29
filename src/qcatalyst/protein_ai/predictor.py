@@ -258,7 +258,7 @@ def create_frozen_split(
     - Version 'v2' enforces strict deduplication and zero ID/sequence overlap.
     """
     if split_strategy == "single_to_multi":
-        if version == "v2" or "is_multi_mutant" in df.columns:
+        if version == "v2":
             # Deduplicate by variant_id across single-site and progressive screening sets
             deduped = df.drop_duplicates(subset=["variant_id"]).copy()
             if "is_multi_mutant" in deduped.columns:
@@ -272,11 +272,18 @@ def create_frozen_split(
                     & (~deduped["variant_id"].isin(train_vids))
                 ].copy()
 
-            # Assert strict disjointness (automated leakage guard)
+            # Assert strict disjointness by both identifier and biological sequence.
             overlap = set(train_df["variant_id"]).intersection(set(eval_df["variant_id"]))
             assert len(overlap) == 0, (
                 f"DATA LEAKAGE DETECTED: {len(overlap)} overlapping IDs in single_to_multi split"
             )
+            if "mutant_sequence" in train_df.columns and "mutant_sequence" in eval_df.columns:
+                train_sequences = set(train_df["mutant_sequence"].dropna().astype(str))
+                eval_sequences = set(eval_df["mutant_sequence"].dropna().astype(str))
+                sequence_overlap = train_sequences.intersection(eval_sequences)
+                assert len(sequence_overlap) == 0, (
+                    f"DATA LEAKAGE DETECTED: {len(sequence_overlap)} overlapping sequences in single_to_multi split"
+                )
         else:
             # Historical v1 partition (preserved for regression testing)
             train_df = df[df["dataset_split"] == "single-site-mutant"].copy()
