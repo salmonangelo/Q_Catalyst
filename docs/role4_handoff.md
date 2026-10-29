@@ -3,13 +3,13 @@
 **From:** Role 1 (Protein ML Lead)  
 **To:** Role 4 (Integration, UI and Pitch Lead)  
 **Date:** October 2026 (Updated for Real Pretrained Models & Leakage-Free Split v2)  
-**Status:** Feature 1–8 Implementation Complete, Real Weights Integrated & Honestly Evaluated
+**Status:** Prior Role 1 artifacts exist; feature branch adds integration hardening and an end-to-end runner. Fresh branch verification is pending.
 
 ---
 
 ## 1. Executive Summary
 
-Role 1 has completed the protein AI, real pretrained foundation model integration (ESM-2 35M and ESM-1v 650M), uncertainty quantification, Gate 0 validation, and baseline benchmarking pipeline for Q-Catalyst.
+Prior execution reports describe real ESM-2 35M and ESM-1v 650M outputs, supervised predictions, uncertainty estimates, Gate 0, and A0–A2 benchmarks. The feature branch now adds a full runner and fail-safe policy bridge; those new integrated changes must be executed and reviewed before this handoff is treated as a fresh end-to-end verification.
 
 ### Critical Rigour Milestone: Split Correction (v1 vs v2)
 During validation, Role 1 audited the experimental splits and discovered that the historical PET-Gym dataset split (`low-to-high-mutant`, $N=149$) contained all $84$ single mutants plus $65$ combinatorial multi-mutants. Evaluating models trained on single mutants against the old $N=149$ split created **56.4% data leakage** (84/149 test variants were in the training set).
@@ -24,7 +24,7 @@ Role 1 immediately created versioned, leakage-free splits (`v2`):
 3. **Real ESM-2 Embeddings:** `results/embeddings/embedding_index.parquet` and `results/embeddings/real_facebook_esm2_t12_35M_UR50D/` (genuine 480-dimensional mean-pooled representations with attention-mask residue-only pooling and SHA-256 caching for all 149 unique variants).
 4. **Supervised Predictions on Split v2:** `results/predictions/predictions.parquet` (XGBoost primary model vs Ridge baseline comparator on separate activity and $T_m$ targets).
 5. **Uncertainty Quantification on Split v2:** `results/uncertainty/uncertainty.parquet` (10-member bootstrap ensemble disagreement, split-conformal intervals, normalized ESM-2 OOD distance, 5XJH catalytic triad structural risk).
-6. **Honest Gate 0 Validation:** `reports/tables/gate0_verdict.json` (**VERDICT: FAIL**, $\rho = -0.3889$, 95% CI $[-0.5985, -0.1352] < 0.0$ on genuine combinatorial multi-mutants).
+6. **Gate 0 Validation:** The previous artifact reports `FAIL`, $\rho = -0.3889$, 95% CI $[-0.5985, -0.1352]$ on the 65-variant held-out pool. The CI is entirely negative and therefore does **not** span zero; it fails because the planned criterion requires a strictly positive lower bound. The required action is `FALLBACK_TO_DIVERSITY_SELECTION`.
 7. **Benchmarking Arms A0–A2:** `results/benchmarks/benchmark_results.parquet` (Precision@5/10/20, EF@10, NDCG@10, Spearman/Kendall with 1000 bootstrap CIs comparing A0 Random, A1 Real ESM-1v, and A2 Supervised XGBoost).
 
 ---
@@ -110,13 +110,13 @@ Role 1 immediately created versioned, leakage-free splits (`v2`):
 * **Key Metric:** Spearman rank correlation between composite uncertainty $U(x)$ and absolute prediction error $|y_{\text{true}} - \hat{y}|$:
   * Point estimate on genuine held-out multi-mutants ($N=65$): $\rho = -0.3889$ ($p = 1.34 \times 10^{-3}$)
   * Bootstrap 95% CI ($B=2000$): $[-0.5985,\ -0.1352]$ (strictly negative)
-* **Empirical Split-Conformal Coverage:** $100\%$ (65/65 held-out variants covered at conformal quantile $q=0.7825$)
+* **Previous-run empirical split-conformal coverage:** $100\%$ (65/65 held-out variants covered at $q=0.7825$; symmetric interval width about 1.565). This is observed coverage on a small retrospective pool, not proof of useful or prospective calibration.
 * **Role 4 Directive:** **`FALLBACK_TO_DIVERSITY_SELECTION`**
 
-### Why this is a MAJOR STRENGTH for the Q-Catalyst Pitch:
-1. **Unmasking Data Leakage:** Under the contaminated v1 split (where 84 single mutants were evaluated in the test set), Gate 0 falsely reported a "PASS". When evaluated honestly on combinatorial multi-mutants, epistemic uncertainty does not track residual error because tree models flatline out-of-distribution while standard deviations shrink near saturated leaves.
-2. **Pre-Registered Scientific Guardrails:** Rather than silently sweeping this under the rug or using uncertainty gating inappropriately, Q-Catalyst's architecture pre-registered an explicit fallback directive: `FALLBACK_TO_DIVERSITY_SELECTION`.
-3. **Rigorous Competition Differentiator:** Judges and ML researchers respect genuine negative results and automated safety triggers over synthetic overclaims. This proves the system is honest, robust, and safe for production laboratory deployment.
+### Interpretation for the project review:
+1. The historical v1 split included single-site variants from the training pool in its evaluation pool; results from that split are not valid held-out estimates.
+2. On the corrected v2 pool, the reported uncertainty/error correlation is negative. This is a warning about the current uncertainty signal under mutational-depth shift; it does not show that the signal is calibrated.
+3. The pre-registered fallback is therefore important: `FALLBACK_TO_DIVERSITY_SELECTION` prevents the system from using an unvalidated uncertainty score to exclude candidates. This is evidence of a useful guardrail, not proof of production robustness.
 
 ---
 
@@ -139,7 +139,7 @@ $$a(x) = \mu D(x) + \eta P(x) - \nu C(x)$$
 | **A1** | Real ESM-1v Zero-Shot Ranking | 0.00 | 0.00 | 0.00 | 0.00x | 0.324 | -0.387 |
 | **A2** | Supervised XGBoost + Structural | **0.40** | **0.20** | **0.15** | **1.86x** | **0.406** | **0.107** |
 
-*Arm A2 delivers an Enrichment Factor of 1.86x at Top-10 and 3.71x at Top-5 over random exploration.*
+*These numbers are from a previous artifact snapshot. The integration branch changes the A0 ranking and A2 prediction source; regenerate the benchmark before presenting any A0–A2 metrics as results from the current branch.*
 
 ---
 
