@@ -2,7 +2,7 @@
 
 **Context-aware, mechanism-informed prioritisation of PETase variants using protein AI, uncertainty-guided computational chemistry, and quantum-chemistry validation.**
 
-> **Project status:** This repository currently defines the project structure and intended interfaces. A folder or script listed below is not evidence that the corresponding feature has been implemented or validated. Update this README as components pass their tests and real results become available.
+> **Project status:** Role 1 has model, prediction, uncertainty, Gate 0, and benchmark modules, plus an end-to-end real-weight runner on branch `feature/role1-end-to-end-pipeline`. The branch adds integration regression tests, a fail-safe Gate 0 policy bridge, and a run manifest. A fresh end-to-end run on the target machine is still required before calling the integrated branch verified. Existing result files and reports may be snapshots from prior runs; use `docs/role1_pipeline_runbook.md` and `reports/role1_pipeline_run.json` to reproduce and verify the current pipeline. A successful software run does not establish a biological improvement or quantum advantage.
 
 ## 1. Overview
 
