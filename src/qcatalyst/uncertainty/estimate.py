@@ -4,7 +4,7 @@ Constructs multi-faceted uncertainty estimates for enzyme variant predictions:
 - Epistemic model disagreement from a bootstrap-replicated XGBoost ensemble.
 - Calibrated prediction intervals using split-conformal regression.
 - Out-of-distribution (OOD) distance signals in representation space.
-- Structural active-site proximity risk flags (with explicit missingness handling).
+- A sequence-numbering-based catalytic-triad proximity heuristic (not 3D geometry) with explicit missingness handling.
 - Scaled aggregate uncertainty score U(x) for candidate acquisition.
 """
 
@@ -162,10 +162,12 @@ def compute_structural_risk(
     structure_positions_str: str | None,
     structure_status: str,
 ) -> tuple[float | None, str]:
-    """Compute active-site proximity risk from mapped 5XJH residue positions.
+    """Compute a 1D residue-numbering heuristic from mapped 5XJH positions.
 
-    Catalytic triad in 5XJH: Ser160, Asp206, His237.
-    A mutation directly adjacent to or inside the triad carries higher structural risk.
+    Catalytic triad in 5XJH numbering: Ser160, Asp206, His237. The score decays
+    with absolute difference in residue numbers. It is NOT Cartesian distance,
+    contact analysis, solvent accessibility, or a 3D active-site gate. Role 2
+    must perform geometry-based checks before chemistry allocation.
     If structural position is unmapped or missing, returns (None, 'missing_unmapped').
     NEVER imputes missing structural signal as zero.
     """
@@ -183,7 +185,7 @@ def compute_structural_risk(
     if not positions:
         return None, "missing_unmapped"
 
-    # Find minimum sequence distance to catalytic triad
+    # Find minimum absolute difference in 5XJH residue numbering (not 3D distance).
     min_dist_to_triad = min(min(abs(p - t) for t in triad_positions) for p in positions)
 
     # Proximity score: 1.0 if directly at triad, decaying with distance
