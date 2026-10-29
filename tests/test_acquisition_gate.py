@@ -14,6 +14,8 @@ def _payload(verdict="PASS", lower=0.12, upper=0.55):
         "gate_passed": passed,
         "ci_lower": lower,
         "ci_upper": upper,
+        "ci_level": 0.95,
+        "n_bootstrap": 2000,
         "recommended_action": (
             "PROCEED_WITH_UNCERTAINTY_GATING" if passed
             else "FALLBACK_TO_DIVERSITY_SELECTION"
@@ -59,6 +61,9 @@ def test_candidate_gate_marks_invalid_rows_and_preserves_policy():
         {
             "variant_id": "good_multi",
             "is_multi_mutant": True,
+            "num_mutations": 2,
+            "esm1v_delta_llr": -1.2,
+            "aggregate_uncertainty": 0.4,
             "is_duplicate": False,
             "mutant_sequence": "ACDE",
             "y_pred_xgb": 1.2,
@@ -67,6 +72,9 @@ def test_candidate_gate_marks_invalid_rows_and_preserves_policy():
         {
             "variant_id": "single",
             "is_multi_mutant": False,
+            "num_mutations": 1,
+            "esm1v_delta_llr": -0.4,
+            "aggregate_uncertainty": 0.2,
             "is_duplicate": False,
             "mutant_sequence": "ACDF",
             "y_pred_xgb": 1.0,
@@ -75,6 +83,9 @@ def test_candidate_gate_marks_invalid_rows_and_preserves_policy():
         {
             "variant_id": "missing_prediction",
             "is_multi_mutant": True,
+            "num_mutations": 2,
+            "esm1v_delta_llr": -0.9,
+            "aggregate_uncertainty": 0.6,
             "is_duplicate": False,
             "mutant_sequence": "ACDG",
             "y_pred_xgb": np.nan,
