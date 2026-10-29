@@ -58,6 +58,10 @@ Do not use `--max-variants` with a value smaller than the full candidate pool fo
 
 A run that fails writes a manifest with `status: failed` and the failing stage. Do not interpret the presence of earlier outputs as a successful end-to-end run.
 
+The candidate-gate artifact also produces `acquisition_score` and `acquisition_rank`. The configured fallback score uses nearest-training-pool cosine distance in the **real ESM-2 embedding space** and the percentile of `y_pred_mean). It follows the existing Role 4 weights `0.50 D + 0.35 P - 0.15 C); when no measured/runtime Tier S/M cost estimate exists, cost is not imputed and the available weights are renormalized. Under Gate 0 FAIL, uncertainty contributes zero and does not exclude otherwise eligible candidates. If Gate 0 passes, the separately configured uncertainty-guided score can include uncertainty percentile; these weights are explicit defaults that should be reviewed, not empirically optimized coefficients.
+
+The rank is a **retrospective prioritisation of the held-out pool**, not a prospective wet-lab selection result. Rows retain `combined_gate_status`, and every output is marked as pending Role 2's actual 3D geometry gate.
+
 ## Run tests
 
 Run offline unit tests first:
