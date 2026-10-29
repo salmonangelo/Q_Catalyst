@@ -37,7 +37,7 @@ diversity_fallback:
 
 uncertainty_guided:
   # Explicit configurable heuristic used only if Gate 0 passes.
-  # Higher calibrated uncertainty is treated as value-of-information for exploration.
+  # Higher uncertainty is treated as a value-of-information heuristic only after Gate 0 supports a positive uncertainty/error association; this is a configurable policy default, not an empirically optimized weight.
   sequence_embedding_diversity_weight: 0.25
   predicted_activity_weight: 0.35
   uncertainty_weight: 0.25
