@@ -63,7 +63,11 @@ def score_arm_a0_random(
     random_seed: int = 42,
     n_permutations: int = 20,
 ) -> np.ndarray:
-    """Generate averaged random rank scores across multiple random seeds for baseline A0."""
+    """Generate one reproducible random ordering for baseline A0.
+
+    For a Monte Carlo random baseline, average metric values across independently
+    generated permutations; do not average per-item scores before ranking.
+    """
     # A single reproducible random permutation gives an actual random ranking.
     # Averaging random scores per item makes scores nearly tied and is not the same
     # as averaging the evaluation metrics over independent random rankings.
@@ -278,11 +282,21 @@ def run_benchmark_suite(
     metrics_a1 = evaluate_all_ranking_metrics(
         y_true, scores_a1, threshold=good_threshold, n_bootstrap=n_bootstrap, seed=random_seed
     )
+    a1_name = (
+        "ESM-1v Zero-Shot Ranking"
+        if not mock_esm
+        else "MOCK BLOSUM62 Proxy (not ESM-1v)"
+    )
+    a1_provenance = (
+        "Real ESM-1v masked-marginal LLR; checkpoint facebook/esm1v_t33_650M_UR90S_1"
+        if not mock_esm
+        else "MOCK synthetic BLOSUM62 log-odds proxy; must not be interpreted as ESM-1v or used for scientific conclusions"
+    )
     for m_name, m_dict in metrics_a1.items():
         records.append(
             BenchmarkRecord(
                 arm_id="A1",
-                arm_name="ESM-1v Zero-Shot Ranking",
+                arm_name=a1_name,
                 target_name=target_name,
                 parent_enzyme=enzyme,
                 split_id="single_to_multi",
@@ -300,7 +314,7 @@ def run_benchmark_suite(
                 random_seed=random_seed,
                 compute_cost_cpu_seconds=round(cost_a1, 4),
                 status="evaluated",
-                provenance="ESM-1v masked marginal log-likelihood ratio (t33_650M_UR90S_1)",
+                provenance=a1_provenance,
             ).to_dict()
         )
 
