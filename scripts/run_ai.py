@@ -855,9 +855,14 @@ def main() -> None:
         help="Max sequences to score or embed (default: 20)",
     )
     parser.add_argument(
+        "--mock",
+        action="store_true",
+        help="Explicitly opt into synthetic proxy outputs for offline smoke tests only; never for scientific benchmarks.",
+    )
+    parser.add_argument(
         "--use-cached-model",
         action="store_true",
-        help="Attempt to load real weights from cache_dir instead of mock proxy",
+        help="Deprecated compatibility flag: real pretrained weights are now the default. Use --mock only for offline tests.",
     )
     parser.add_argument(
         "--split-version",
@@ -868,7 +873,10 @@ def main() -> None:
     )
 
     args = parser.parse_args()
-    mock = not args.use_cached_model
+    if args.mock and args.use_cached_model:
+        parser.error("--mock and --use-cached-model are contradictory; omit --use-cached-model when opting into mocks.")
+    # Production-real weights are the CLI default. Mock behavior requires explicit opt-in.
+    mock = bool(args.mock)
 
     if args.run_benchmarks:
         code = run_benchmarking(
