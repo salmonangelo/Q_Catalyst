@@ -9,13 +9,13 @@ esm1v:
   active_checkpoint_count: 1
   ensemble_members:
     - "facebook/esm1v_t33_650M_UR90S_1"
-  cache_dir: "C:/Users/Asus/.cache/huggingface/hub"
+  cache_dir: null # Use the default Hugging Face cache location from the environment.
   device: "cpu"
   batch_size: 1
   max_sequence_length: 1024
   allow_automatic_downloads: false
   mock_fallback: false
-  mock_mode_requires_explicit_opt_in: true
+  production_api_default: "real_weights; pass mock=True explicitly for offline tests"
 
 esm2:
   embedding_model: "facebook/esm2_t12_35M_UR50D"
