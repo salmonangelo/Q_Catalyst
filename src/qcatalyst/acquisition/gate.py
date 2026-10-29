@@ -132,8 +132,15 @@ def annotate_candidate_gate(candidates: pd.DataFrame, decision: GatePolicyDecisi
     chemistry_eligible: list[bool] = []
     for _, row in out.iterrows():
         row_reasons: list[str] = []
-        is_multi = bool(row.get("is_multi_mutant", int(row.get("num_mutations", 0) or 0) > 1))
-        is_duplicate = bool(row.get("is_duplicate", False))
+        raw_multi = row.get("is_multi_mutant", None)
+        if raw_multi is None or pd.isna(raw_multi):
+            raw_count = row.get("num_mutations", 0)
+            n_mutations = int(raw_count) if pd.notna(raw_count) else 0
+            is_multi = n_mutations > 1
+        else:
+            is_multi = bool(raw_multi)
+        raw_duplicate = row.get("is_duplicate", False)
+        is_duplicate = bool(raw_duplicate) if pd.notna(raw_duplicate) else False
         sequence = row.get("mutant_sequence")
         if not is_multi:
             row_reasons.append("not_multi_mutant")
