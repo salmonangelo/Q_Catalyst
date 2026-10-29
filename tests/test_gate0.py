@@ -224,6 +224,6 @@ def test_gate0_real_dataset_integrity():
         )
     else:
         assert result.verdict == "PASS"
-    assert result.recommended_action == "PROCEED_WITH_UNCERTAINTY_GATING"
+        assert result.recommended_action == "PROCEED_WITH_UNCERTAINTY_GATING"
     assert result.auroc is not None
     assert result.auroc_status == "valid"
