@@ -22,6 +22,7 @@ for entry in (REPO_ROOT, SRC_DIR):
     if str(entry) not in sys.path:
         sys.path.insert(0, str(entry))
 
+import numpy as np
 import pandas as pd
 
 from scripts import run_ai
