@@ -110,8 +110,8 @@ def compute_spearman_bootstrap_ci(
 
     n = len(x)
     if n < 4 or np.all(x == x[0]) or np.all(y == y[0]):
-        # Degenerate case: constant or insufficient data
-        return 0.0, 1.0, 0.0, 0.0, True
+        # Degenerate case: constant or insufficient data must fail closed.
+        return 0.0, 1.0, -1.0, 1.0, True
 
     res = spearmanr(x, y)
     rho = float(res.statistic) if hasattr(res, "statistic") else float(res[0])
@@ -134,8 +134,9 @@ def compute_spearman_bootstrap_ci(
             boot_rhos.append(float(r))
 
     if len(boot_rhos) < 100:
-        # Fallback if resamples degenerated
-        return rho, p_val, rho, rho, (rho <= 0.0)
+        # Too few valid resamples means the interval is not estimable. Return a
+        # conservative interval spanning zero so this uncertainty signal cannot pass Gate 0.
+        return rho, p_val, -1.0, 1.0, True
 
     alpha = 1.0 - ci_level
     lower_pct = 100.0 * (alpha / 2.0)
@@ -221,11 +222,11 @@ def evaluate_gate0(
     Returns:
         Gate0Result with full statistics, bootstrap CI, AUROC, and gate verdict.
     """
-    # Enforce strictly held-out data
-    if "split_role" in test_df.columns:
-        eval_df = test_df[test_df["split_role"] == "held_out_test"].copy()
-    else:
-        eval_df = test_df.copy()
+    # Enforce provenance: without split roles the function cannot prove that the
+    # supplied rows are held out, so it must not issue a PASS verdict.
+    if "split_role" not in test_df.columns:
+        raise ValueError("Gate 0 requires split_role provenance; expected held_out_test rows.")
+    eval_df = test_df[test_df["split_role"] == "held_out_test"].copy()
 
     if eval_df.empty:
         raise ValueError("No held-out test variants found in evaluation dataframe.")
