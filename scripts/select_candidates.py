@@ -184,10 +184,13 @@ def build_role1_candidate_gate(
         on="variant_id", how="left", validate="one_to_one",
     )
 
+    decision = resolve_gate0_policy(gate0_verdict_path)
     if candidate["y_pred_xgb"].isna().any():
         raise ValueError("At least one held-out candidate has no supervised XGBoost prediction.")
-    if candidate["aggregate_uncertainty"].isna().any():
-        raise ValueError("At least one held-out candidate has no aggregate uncertainty value.")
+    if decision.uncertainty_gating_enabled and candidate["aggregate_uncertainty"].isna().any():
+        raise ValueError(
+            "Gate 0 permits uncertainty gating but at least one candidate lacks aggregate uncertainty."
+        )
     if candidate["esm1v_delta_llr"].isna().any():
         bad = candidate.loc[candidate["esm1v_delta_llr"].isna(), "variant_id"].astype(str).tolist()
         raise ValueError(f"At least one held-out candidate lacks a real ESM-1v score: {bad[:5]}")
@@ -205,7 +208,6 @@ def build_role1_candidate_gate(
         )
     candidate["esm2_sequence_match"] = True
 
-    decision = resolve_gate0_policy(gate0_verdict_path)
     output = annotate_candidate_gate(candidate, decision)
     output["pipeline_split_version"] = str(manifest.get("version", "unknown"))
     output["candidate_pool_role"] = "held_out_multi_mutant"
