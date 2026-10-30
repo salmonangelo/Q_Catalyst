@@ -49,3 +49,16 @@ scientific_limits:
   require_role2_geometry_check_before_chemistry: true
   model_predictions_are_not_wet_lab_validation: true
   zero_shot_llr_is_not_direct_activity: true
+weights:
+  lambda_uncertainty: 0.4
+  eta_performance: 0.3
+  mu_diversity: 0.2
+  nu_cost: 0.1
+structural_filter:
+  radius_angstrom: 8.0
+  alternative_radii: [6.0, 8.0, 10.0, 12.0]
+  reference_atom: "Ser160_OG"
+budget:
+  max_chemistry_jobs: 12
+  max_quantum_jobs: 5
+fallback_mode: "stratified_diversity"

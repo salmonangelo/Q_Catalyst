@@ -1,0 +1,23 @@
+active_space:
+  electrons: 4
+  orbitals: 4
+  spin: 0
+  description: "Ser160 O_gamma lone pair and carbonyl pi/pi* active space"
+ansatz:
+  type: "TwoLocal"
+  rotation_blocks: ["ry"]
+  entanglement_blocks: ["cz"]
+  entanglement: "linear"
+  reps: 2
+optimizer:
+  name: "COBYLA"
+  maxiter: 100
+  tol: 1.0e-5
+simulation:
+  backend: "statevector_simulator"
+  shots: 1024
+  noise_levels: [0.0, 0.002, 0.008, 0.020]
+  noise_model: "depolarizing_pauli"
+thresholds:
+  chemical_accuracy_kcal_mol: 1.6
+  max_tolerable_error_kcal_mol: 3.5

@@ -37,6 +37,32 @@ api = [
 ]
 chemistry = [
   "pyscf>=2.6",
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "qcatalyst"
+version = "1.0.0"
+description = "Context-aware, mechanism-informed prioritisation of PETase variants using protein AI, uncertainty-guided computational chemistry, and quantum-chemistry validation."
+authors = [{ name = "Q-Catalyst Research Team" }]
+license = { text = "MIT" }
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "numpy>=1.24",
+    "scipy>=1.10",
+    "pandas>=2.0",
+    "pyarrow>=12.0",
+    "scikit-learn>=1.3",
+    "xgboost>=1.7",
+    "streamlit>=1.30",
+    "plotly>=5.18",
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
 ]
 
 [tool.setuptools.packages.find]

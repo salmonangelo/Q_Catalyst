@@ -1,0 +1,10 @@
+{
+  "gate0_passed": false,
+  "spearman_rho": -0.2,
+  "p_value": 0.8,
+  "ci_lower_95": -1.0,
+  "ci_upper_95": 1.0,
+  "auroc_worst_quartile": 0.0,
+  "sample_count": 4,
+  "recommendation": "Gate 0 NOT VALIDATED: Uncertainty failed strictly positive CI criterion; fallback to stratified diversity selection."
+}

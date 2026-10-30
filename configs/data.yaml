@@ -1,0 +1,16 @@
+parent_enzyme: "IsPETase"
+reference_pdb: "5XJH"
+sequence_length: 290
+mature_offset: 0
+splits:
+  train_ratio: 0.70
+  val_ratio: 0.15
+  test_ratio: 0.15
+  split_strategy: "identity_aware"
+  random_seed: 42
+curation:
+  reference_temperature_c: 40.0
+  reference_ph: 8.0
+  substrate_type: "PET_film_amorphous"
+  allow_inferred_context: false
+  min_replicates: 1

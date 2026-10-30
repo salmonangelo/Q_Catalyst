@@ -65,10 +65,10 @@ class SplitConformalCalibrator:
         y_pred = y_pred[mask]
         self.n_cal = len(y_true)
 
-        # Use the original alpha rather than 1 - target_coverage to avoid a
-        # floating-point round-trip turning 0.10 into 0.09999999999999998.
-        min_finite_quantile_n = max(5, math.ceil(1.0 / self.alpha) - 1)
-        if self.n_cal < min_finite_quantile_n:
+        # The finite-sample conformal quantile rank is ceil((n + 1) * (1 - alpha)).
+        # If this rank exceeds n, the quantile would exceed 1.0 (infinite sample required).
+        k_rank = math.ceil(round((self.n_cal + 1) * (1.0 - self.alpha), 9))
+        if self.n_cal < 5 or k_rank > self.n_cal:
             # The requested finite-sample conformal quantile would exceed q=1;
             # do not call the resulting intervals calibrated.
             self.threshold_q = None

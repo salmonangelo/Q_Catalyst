@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+    <title>Mol* Local Candidate Test</title>
+    <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/molstar@latest/build/viewer/molstar.css" />
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body { width: 100%; height: 100%; overflow: hidden; background: #070B16; }
+        #app { width: 100%; height: 100%; position: absolute; }
+    </style>
+</head>
+<body>
+    <div id="app"></div>
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/molstar@latest/build/viewer/molstar.js"></script>
+    <script type="text/javascript">
+        // Small sample PDB data or fetch local test
+        const samplePdb = `HEADER    TEST
+ATOM      1  N   SER A 160      16.120  23.850  17.920  1.00 88.00           N
+ATOM      2  CA  SER A 160      15.240  24.120  18.510  1.00 88.00           C
+ATOM      3  C   SER A 160      14.280  20.450  16.820  1.00 88.00           C
+ATOM      4  O   SER A 160      14.850  21.650  17.420  1.00 88.00           O
+ATOM      5  CB  SER A 160      13.120  19.450  16.100  1.00 88.00           C
+ATOM      6  OG  SER A 160      15.240  24.120  18.510  1.00 88.00           O
+ATOM      7  N   HIS A 237      14.280  20.450  16.820  1.00 88.00           N
+ATOM      8  CA  HIS A 237      14.850  21.650  17.420  1.00 88.00           C
+ATOM      9  C   HIS A 237      12.150  18.250  15.340  1.00 88.00           C
+ATOM     10  O   HIS A 237      13.120  19.450  16.100  1.00 88.00           O
+END
+`;
+        molstar.Viewer.create('app', {
+            layoutShowControls: true,
+            collapseLeftPanel: true,
+            viewportShowExpand: false
+        }).then(viewer => {
+            viewer.loadStructureFromData(samplePdb, 'pdb', { dataLabel: 'Candidate Triad' });
+            console.log("Molstar loaded candidate data successfully!");
+        }).catch(err => {
+            console.error("Molstar error:", err);
+        });
+    </script>
+</body>
+</html>
