@@ -1,0 +1,48 @@
+{
+  "description": "CASCI Exact Classical Reference Control for Role 3 Quantum VQE",
+  "active_space": "(4e, 4o)",
+  "basis": "def2-SVP",
+  "method": "PySCF CASCI with AMBER ff14SB QM/MM embedding",
+  "variants": {
+    "WT": {
+      "e_casci_ha": -1023.0473988225704,
+      "e_hf_ref_ha": -1022.965284,
+      "correlation_energy_ha": -0.082115
+    },
+    "S121E": {
+      "variant_id": "VAR_A4_01",
+      "e_casci_ha": -1023.0510530874101,
+      "e_hf_ref_ha": -1022.978034,
+      "correlation_energy_ha": -0.073019,
+      "esp_at_ser_og_au": -5.943489
+    },
+    "D186H": {
+      "variant_id": "VAR_A4_02",
+      "e_casci_ha": -1023.0620951073844,
+      "e_hf_ref_ha": -1023.009733,
+      "correlation_energy_ha": -0.052362,
+      "esp_at_ser_og_au": -5.912738
+    },
+    "W159H": {
+      "variant_id": "VAR_A4_03",
+      "e_casci_ha": -1023.0068847832223,
+      "e_hf_ref_ha": -1023.002188,
+      "correlation_energy_ha": -0.004696,
+      "esp_at_ser_og_au": -5.826334
+    },
+    "S238F": {
+      "variant_id": "VAR_A4_04",
+      "e_casci_ha": -1023.0689381980294,
+      "e_hf_ref_ha": -1022.981563,
+      "correlation_energy_ha": -0.087375,
+      "esp_at_ser_og_au": -5.943902
+    },
+    "T88I": {
+      "variant_id": "VAR_A4_05",
+      "e_casci_ha": -1023.0455933502576,
+      "e_hf_ref_ha": -1022.972691,
+      "correlation_energy_ha": -0.072902,
+      "esp_at_ser_og_au": -5.935765
+    }
+  }
+}

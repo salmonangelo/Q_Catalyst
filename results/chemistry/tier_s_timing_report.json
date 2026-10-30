@@ -1,0 +1,29 @@
+{
+  "timestamp": "2026-10-25T14:59:13Z",
+  "cluster_tier": "Tier S",
+  "description": "Catalytic triad (Ser160, His237, Asp206), Met161 oxyanion donor, and methyl ester PET model",
+  "natoms": 42,
+  "nelec": 158,
+  "charge": -1,
+  "spin": 0,
+  "basis_set": "def2-SVP",
+  "density_fitting": true,
+  "nbasis": 390,
+  "timings_sec": {
+    "rhf_density_fit": 27.14,
+    "b3lyp_density_fit": 77.24,
+    "total_single_point": 104.38
+  },
+  "budget_implications": {
+    "max_runtime_per_variant_sec": 180.0,
+    "tier_s_decision": "GO (Tier S is validated within 180s wall-clock CPU budget)",
+    "budget_b_cls_recommended": 15,
+    "budget_b_q_recommended": 5,
+    "total_cpu_hours_for_15_variants": 0.435
+  },
+  "role3_handoff": {
+    "cluster_geometry_xyz": "results/quantum/cluster_tier_s_for_role3.xyz",
+    "active_space_recommended": "(4e, 4o) or (6e, 6o)",
+    "qubit_count_parity": "6 qubits (4e, 4o with two-qubit reduction)"
+  }
+}

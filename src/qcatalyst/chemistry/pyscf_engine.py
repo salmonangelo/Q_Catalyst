@@ -1,131 +1,164 @@
 """
-Computational chemistry engine computing reduced active-site cluster descriptors.
+PySCF Electronic Structure Engine for Q-Catalyst
+Performs RHF, DFT (B3LYP / wB97X-D) with def2-SVP/TZVP, density fitting,
+QM/MM electrostatic embedding, population analysis, and CASCI active-space calculations.
 """
-from typing import Dict, List, Any
+
+import time
+from typing import Dict, List, Tuple, Optional, Any
 import numpy as np
-import pandas as pd
+from pyscf import gto, scf, dft, mcscf, qmmm
 
 
-class ClusterChemistryEngine:
+class PySCFChemistryEngine:
     """
-    Computes electronic and structural descriptors for IsPETase active-site cluster
-    (Ser160-His237-Asp206 catalytic triad + Tyr87/Met161 oxyanion hole + ester substrate).
+    Executes all electronic structure calculations on the Tier S active-site cluster.
     """
-    def __init__(self, method: str = "B3LYP-D3", basis: str = "def2-SVP"):
-        self.method = method
-        self.basis = basis
-        # Baseline reference values for Wild-Type cluster
-        self.wt_baseline = {
-            "d_attack_angstrom": 2.85,
-            "d_hbond_his_ser": 2.74,
-            "d_hbond_asp_his": 2.68,
-            "esp_active_site_au": -0.142,
-            "delta_e_int_kcal_mol": -18.40,
-            "homo_lumo_gap_ev": 4.12,
-            "ts_stabilization_kcal_mol": 0.0
+
+    def __init__(
+        self,
+        basis: str = "def2-svp",
+        functional: str = "b3lyp",
+        use_density_fitting: bool = True,
+        conv_tol: float = 1e-6,
+    ):
+        self.basis = basis.lower()
+        self.functional = functional.lower()
+        self.use_density_fitting = use_density_fitting
+        self.conv_tol = conv_tol
+
+    def _build_mol(self, geometry_str: str, charge: int = -1, spin: int = 0) -> gto.Mole:
+        mol = gto.Mole()
+        mol.atom = geometry_str
+        mol.basis = self.basis
+        mol.charge = charge
+        mol.spin = spin
+        mol.build(verbose=0)
+        return mol
+
+    def run_single_point(
+        self,
+        geometry_str: str,
+        charge: int = -1,
+        spin: int = 0,
+        mm_coords: Optional[np.ndarray] = None,
+        mm_charges: Optional[np.ndarray] = None,
+        run_dft: bool = True,
+    ) -> Dict[str, Any]:
+        """
+        Runs RHF and optionally DFT single point with or without QM/MM point-charge embedding.
+        """
+        mol = self._build_mol(geometry_str, charge, spin)
+        nbasis = mol.nao_nr()
+        natoms = mol.natm
+
+        # 1. RHF
+        t0 = time.perf_counter()
+        mf_hf = scf.RHF(mol)
+        if self.use_density_fitting:
+            mf_hf = mf_hf.density_fit()
+        if mm_coords is not None and mm_charges is not None and len(mm_charges) > 0:
+            mf_hf = qmmm.mm_charge(mf_hf, mm_coords, mm_charges)
+        mf_hf.conv_tol = self.conv_tol
+        e_hf = float(mf_hf.kernel())
+        time_hf = time.perf_counter() - t0
+
+        # Extract Mulliken population
+        mulliken_pop, charges = mf_hf.mulliken_pop(verbose=0)
+
+        result = {
+            "natoms": natoms,
+            "nbasis": nbasis,
+            "basis": self.basis,
+            "density_fitting": self.use_density_fitting,
+            "e_hf": e_hf,
+            "hf_converged": bool(mf_hf.converged),
+            "time_hf_sec": round(time_hf, 3),
+            "mulliken_charges": [round(float(q), 4) for q in charges],
+            "mf_hf": mf_hf,
         }
 
-    def compute_cluster_descriptors(self, variant_id: str, mutations_str: str, min_dist: float) -> Dict[str, Any]:
+        # 2. DFT
+        if run_dft:
+            t0 = time.perf_counter()
+            mf_dft = dft.RKS(mol)
+            mf_dft.xc = self.functional
+            if self.use_density_fitting:
+                mf_dft = mf_dft.density_fit()
+            if mm_coords is not None and mm_charges is not None and len(mm_charges) > 0:
+                mf_dft = qmmm.mm_charge(mf_dft, mm_coords, mm_charges)
+            mf_dft.conv_tol = self.conv_tol
+            e_dft = float(mf_dft.kernel())
+            time_dft = time.perf_counter() - t0
+
+            # DFT Mulliken charges
+            _, dft_charges = mf_dft.mulliken_pop(verbose=0)
+
+            result["e_dft"] = e_dft
+            result["functional"] = self.functional
+            result["dft_converged"] = bool(mf_dft.converged)
+            result["time_dft_sec"] = round(time_dft, 3)
+            result["dft_mulliken_charges"] = [round(float(q), 4) for q in dft_charges]
+            result["mf_dft"] = mf_dft
+
+        return result
+
+    def compute_esp_at_point(
+        self,
+        target_point: np.ndarray,
+        mm_coords: np.ndarray,
+        mm_charges: np.ndarray,
+    ) -> float:
         """
-        Calculates quantum chemical descriptors for a candidate variant cluster.
-        Mutations close to the active site modulate attack trajectory, H-bond networks, and ESP.
+        Calculates electrostatic potential (ESP) in atomic units at target_point (e.g. Ser160 OG)
+        generated by the AMBER ff14SB point-charge environment.
+        V = sum_i (q_i / |r - r_i|) (in a.u., 1 a.u. = 627.509 kcal/mol/e)
         """
-        if mutations_str == "WT":
-            res = dict(self.wt_baseline)
-            res.update({
-                "job_id": f"CHEM-JOB-WT",
-                "variant_id": variant_id,
-                "mutations": mutations_str,
-                "cluster_model": "Triad_Oxyanion_MHET_Cluster_76atoms",
-                "qm_runtime_seconds": 18.5,
-                "basis_functions": 612,
-                "qm_converged": True,
-                "method": self.method,
-                "basis": self.basis
-            })
-            return res
+        # Distance in Bohr (1 Angstrom = 1.889726 Bohr)
+        BOHR_PER_ANGSTROM = 1.889726124565062
+        diffs = (mm_coords - target_point) * BOHR_PER_ANGSTROM
+        dists = np.linalg.norm(diffs, axis=1)
+        # Avoid division by zero
+        dists = np.maximum(dists, 0.1)
+        esp_au = float(np.sum(mm_charges / dists))
+        return esp_au
 
-        muts = [m.strip() for m in mutations_str.split(",") if m.strip()]
-        
-        # Mechanistic descriptor modulation based on mutated functional groups
-        delta_attack = 0.0
-        delta_hbond_his = 0.0
-        delta_esp = 0.0
-        delta_e_int = 0.0
-        delta_ts = 0.0
+    def run_casci_reference(
+        self,
+        geometry_str: str,
+        ncas: int = 4,
+        nelecas: Tuple[int, int] = (2, 2),
+        charge: int = -1,
+        spin: int = 0,
+        mm_coords: Optional[np.ndarray] = None,
+        mm_charges: Optional[np.ndarray] = None,
+    ) -> Dict[str, Any]:
+        """
+        Runs exact classical Complete Active Space Configuration Interaction (CASCI)
+        to serve as the benchmark 'answer key' for Role 3's VQE algorithm.
+        """
+        mol = self._build_mol(geometry_str, charge, spin)
+        mf = scf.RHF(mol)
+        if self.use_density_fitting:
+            mf = mf.density_fit()
+        if mm_coords is not None and mm_charges is not None and len(mm_charges) > 0:
+            mf = qmmm.mm_charge(mf, mm_coords, mm_charges)
+        mf.conv_tol = self.conv_tol
+        mf.kernel()
 
-        for m in muts:
-            pos = int(m[1:-1])
-            target_aa = m[-1]
-
-            if pos == 160: # Catalytic Serine dead mutant
-                delta_attack += 1.85 # Destroys attack geometry
-                delta_hbond_his += 1.20
-                delta_e_int += 14.5
-                delta_ts += 18.0
-            elif pos == 237: # Catalytic His dead mutant
-                delta_hbond_his += 1.50
-                delta_e_int += 12.0
-                delta_ts += 16.0
-            elif pos == 159: # W159H widens subsite cleft, lowers steric barrier
-                delta_attack -= 0.12
-                delta_e_int -= 1.85
-                delta_ts -= 2.40
-                delta_esp -= 0.015
-            elif pos == 121: # S121E forms extra stabilizing salt bridge
-                delta_e_int -= 2.10
-                delta_ts -= 1.90
-                delta_esp -= 0.022
-            elif pos == 186: # D186H partners with S121E
-                delta_e_int -= 1.40
-                delta_ts -= 1.30
-            elif pos == 280: # R280A reduces surface electrostatic clashing
-                delta_e_int -= 0.80
-                delta_ts -= 0.70
-            elif pos == 229: # F229Y aromatic stacking with substrate
-                delta_attack -= 0.08
-                delta_e_int -= 1.60
-                delta_ts -= 1.80
-            elif pos == 88: # T88M near oxyanion hole
-                delta_hbond_his -= 0.04
-                delta_e_int -= 0.90
-            elif pos == 205: # G205A loop clash
-                delta_attack += 0.25
-                delta_e_int += 3.20
-                delta_ts += 4.10
-            elif pos == 58: # Y58A loss of stacking
-                delta_e_int += 4.50
-                delta_ts += 5.20
-            else:
-                # General perturbation scaled by distance
-                damping = np.exp(-min_dist / 6.0)
-                delta_e_int += np.random.uniform(-0.5, 0.5) * damping
-
-        # Compute modulated descriptors
-        d_attack = float(np.round(np.clip(self.wt_baseline["d_attack_angstrom"] + delta_attack, 2.40, 5.0), 3))
-        d_hbond_his = float(np.round(np.clip(self.wt_baseline["d_hbond_his_ser"] + delta_hbond_his, 2.50, 4.5), 3))
-        d_hbond_asp = float(self.wt_baseline["d_hbond_asp_his"])
-        esp_val = float(np.round(self.wt_baseline["esp_active_site_au"] + delta_esp, 4))
-        e_int = float(np.round(self.wt_baseline["delta_e_int_kcal_mol"] + delta_e_int, 2))
-        homo_lumo = float(np.round(self.wt_baseline["homo_lumo_gap_ev"] - 0.08 * (delta_ts < 0), 2))
-        ts_stab = float(np.round(delta_ts, 2)) # Negative value means stabilized transition state (favorable)
-
-        runtime = float(np.round(15.0 + 3.5 * len(muts), 1))
+        # CASCI
+        t0 = time.perf_counter()
+        mycas = mcscf.CASCI(mf, ncas, nelecas)
+        res = mycas.kernel()
+        e_tot = float(res[0])
+        cas_time = time.perf_counter() - t0
 
         return {
-            "variant_id": variant_id,
-            "mutations": mutations_str,
-            "cluster_model": "Triad_Oxyanion_MHET_Cluster_76atoms",
-            "d_attack_angstrom": d_attack,
-            "d_hbond_his_ser": d_hbond_his,
-            "d_hbond_asp_his": d_hbond_asp,
-            "esp_active_site_au": esp_val,
-            "delta_e_int_kcal_mol": e_int,
-            "homo_lumo_gap_ev": homo_lumo,
-            "ts_stabilization_kcal_mol": ts_stab,
-            "qm_runtime_seconds": runtime,
-            "basis_functions": 612 + 18 * len(muts),
-            "qm_converged": True,
-            "method": self.method,
-            "basis": self.basis
+            "ncas_orbitals": ncas,
+            "nelecas": nelecas,
+            "e_casci_total": e_tot,
+            "e_hf_ref": float(mf.e_tot),
+            "correlation_energy_ha": round(e_tot - float(mf.e_tot), 6),
+            "casci_time_sec": round(cas_time, 3),
+            "mo_coeff_shape": list(mycas.mo_coeff.shape),
         }

@@ -1,108 +1,87 @@
-# Interface Contracts and Schema Specifications
+# Q-Catalyst Authoritative Interface Contracts
 
-This document defines the authoritative file contracts across all 4 roles in the Q-Catalyst pipeline.
+**Version:** 1.0.0  
+**Effective Date:** October 2026  
+**Scope:** Shared data structures, file locations, and serialization schemas across all roles.
 
-## 1. `variants.parquet` (Role 1)
-- `variant_id` (str): Unique variant identifier (e.g. `PET-VAR-001`).
-- `parent_enzyme` (str): Parent wild-type enzyme name (e.g. `IsPETase`).
-- `sequence` (str): Full amino acid sequence (mature form, length 290).
-- `mutations` (str): Comma-separated list of mutations in 5XJH numbering (e.g. `S121E,D186H,R280A`) or `WT`.
-- `mutation_count` (int): Number of point mutations from parent.
-- `study_id` (str): Source publication or dataset release.
-- `assay_id` (str): Assay identifier.
-- `temperature_c` (float): Assay incubation temperature in °C.
-- `ph` (float): Assay buffer pH.
-- `substrate_type` (str): Substrate state (e.g. `PET_film_amorphous`, `PET_powder`).
-- `raw_activity` (float): Direct experimental activity metric.
-- `activity_unit` (str): Measurement unit (e.g. `umol_product_h_mg`).
-- `relative_activity` (float): Normalized relative activity ($A_{\text{variant}} / A_{\text{WT}}$).
-- `tm_c` (float, nullable): Melting temperature in °C.
-- `delta_tm` (float, nullable): Thermal stability change vs WT in °C ($T_m - T_{m,\text{WT}}$).
-- `is_prior_art` (bool): True if variant corresponds to known published high-performance variant (e.g. FAST-PETase, DuraPETase, ThermoPETase).
-- `data_quality_flag` (str): Quality flag (`VERIFIED_EXPERIMENTAL`, `INFERRED_REPLICATE`, etc.).
+---
 
-## 2. `predictions.parquet` (Role 1)
-- `variant_id` (str): Matches `variants.parquet`.
-- `pred_activity` (float): Supervised predicted relative activity.
-- `pred_interval_lower` (float): 90% conformal lower bound.
-- `pred_interval_upper` (float): 90% conformal upper bound.
-- `pred_delta_tm` (float): Predicted thermal stability shift $\Delta T_m$.
-- `zero_shot_esm_score` (float): ESM zero-shot fitness score.
-- `split` (str): Dataset split (`train`, `val`, `test`).
-- `model_version` (str): Predictor version identifier.
+## 1. Overview of File Contracts
 
-## 3. `uncertainty.parquet` (Role 1)
-- `variant_id` (str): Matches `variants.parquet`.
-- `aggregate_uncertainty` (float): Normalized uncertainty score $U \in [0, 1]$.
-- `ensemble_std` (float): Standard deviation across model ensemble predictions.
-- `conformal_interval_width` (float): Upper minus lower conformal bound.
-- `ood_distance` (float): Mahalanobis/Euclidean embedding distance from WT reference cluster.
-- `structural_risk` (float): Risk penalty based on proximity to catalytic triad or buried core.
-- `gate0_pass` (bool): Whether Gate 0 validation criteria were satisfied.
-- `abstention_flag` (bool): True if uncertainty is excessively high for safe recommendation.
+| File Path | Owner | Consumers | Format | Purpose |
+|---|---|---|---|---|
+| `data/curated/variants.parquet` | Role 1 | Roles 2, 4 | Parquet | Canonical variants with structure-mapped positions |
+| `results/predictions/predictions.parquet` | Role 1 | Role 4 | Parquet | Supervised model predictions (XGBoost, Ridge) |
+| `results/uncertainty/uncertainty.parquet` | Role 1 | Role 4 | Parquet | Split-conformal bounds and composite uncertainty $U(x)$ |
+| `results/benchmarks/benchmark_results.parquet` | Role 1 | Role 4 | Parquet | Prioritisation benchmark metrics across arms A0–A7 |
+| `reports/tables/gate0_verdict.json` | Role 1 | Role 4 | JSON | Gate 0 decision verdict and validation statistics |
+| `chem_jobs.json` | Role 4 | Role 2 | JSON | Ordered list of candidate variants for classical chemistry |
+| `results/chemistry/chem_results.parquet` | Role 2 | Roles 3, 4 | Parquet | PySCF descriptors, cluster energies, and CASCI inputs |
+| `results/quantum/quantum_results.parquet` | Role 3 | Role 4 | Parquet | Active-space CASCI vs VQE energies and error metrics |
+| `results/ranking/ranking.parquet` | Role 4 | Dashboard | Parquet | Final fused multi-objective ranking and confidence tiers |
 
-## 4. `chem_jobs.json` (Role 4)
-- `job_id` (str): Computational chemistry job ID (e.g. `CHEM-JOB-001`).
-- `variant_id` (str): Target variant.
-- `mutations` (str): Mutation description.
-- `min_dist_to_triad_angstrom` (float): Minimum distance to Ser160/active site.
-- `acquisition_score` (float): Computed score $a(x) = \lambda U + \eta P + \mu D - \nu C$.
-- `selection_rank` (int): Rank in chemistry queue.
-- `status` (str): `SCHEDULED`, `COMPLETED`, `SKIPPED`.
+---
 
-## 5. `chem_results.parquet` (Role 2)
-- `job_id` (str): Matches `chem_jobs.json`.
-- `variant_id` (str): Matches `variants.parquet`.
-- `cluster_model` (str): Active-site cluster description (Triad + oxyanion + substrate).
-- `d_attack_angstrom` (float): Distance from Ser160-Oγ to substrate ester carbonyl C.
-- `d_hbond_his_ser` (float): His237-Nε2 to Ser160-Oγ hydrogen bond length.
-- `d_hbond_asp_his` (float): Asp206-Oδ to His237-Nδ1 hydrogen bond length.
-- `esp_active_site_au` (float): Electrostatic potential at catalytic center.
-- `delta_e_int_kcal_mol` (float): Interaction energy proxy relative to wild type.
-- `homo_lumo_gap_ev` (float): Active site HOMO-LUMO energy gap.
-- `ts_stabilization_kcal_mol` (float): Transition-state stabilization proxy.
-- `qm_runtime_seconds` (float): PySCF cluster execution duration.
-- `qm_converged` (bool): Convergence flag.
+## 2. Detailed Schemas
 
-## 6. `quantum_results.parquet` (Role 3)
-- `job_id` (str): Quantum evaluation job ID.
-- `variant_id` (str): Target variant.
-- `active_space` (str): Active space specification (e.g. `(4e, 4o)`).
-- `e_casci_hartree` (float): Exact classical ground-state energy.
-- `e_vqe_hartree` (float): Ground-state energy from VQE simulation.
-- `energy_error_hartree` (float): $|E_{\text{VQE}} - E_{\text{CASCI}}|$.
-- `energy_error_kcal_mol` (float): Absolute error in kcal/mol.
-- `chemical_accuracy_met` (bool): True if error $\le 1.6$ kcal/mol.
-- `qubit_count` (int): Number of qubits (8 for (4e, 4o) Jordan-Wigner).
-- `circuit_depth` (int): Quantum circuit depth.
-- `cnot_count` (int): Number of two-qubit entangling gates.
-- `vqe_iterations` (int): Number of optimizer evaluations.
-- `noise_level` (float): Simulated depolarizing error rate.
-- `vqe_runtime_seconds` (float): Simulator runtime.
+### 2.1 `variants.parquet`
+- `row_id` (str): Unique record ID (`petgym_{enzyme}_{mutant_type}_{idx}`).
+- `variant_id` (str): Unique variant ID (`{parent}_{canonical_mutations}`).
+- `parent_enzyme` (str): Wild-type enzyme identifier (`IsPETase`, `BhrPETase`, `CaPETase`).
+- `dataset_split` (str): Dataset split category (`single-site-mutant`, `low-to-high-mutant`).
+- `study_id` (str): Originating research publication / dataset identifier.
+- `mutant_raw` (str): Original notation in source publication.
+- `mutations_canonical` (str): Colon-separated, position-sorted mutations.
+- `num_mutations` (int): Count of point mutations relative to wild-type.
+- `is_multi_mutant` (bool): True if `num_mutations > 1`.
+- `wildtype_sequence` (str): Full wild-type amino-acid sequence.
+- `mutant_sequence` (str): Complete mutated sequence.
+- `structure_5xjh_positions` (str): Mapped residues in 5XJH crystal structure numbering.
+- `structure_mapping_status` (str): `exact_1to1` or `unmapped`.
+- `activity_raw` (float or null): Experimental activity (relative fold change for IsPETase).
+- `activity_unit` (str): Unit of activity measurement.
+- `tm_raw` (float or null): Experimental melting temperature in °C.
+- `tm_unit` (str): Unit of thermostability measurement (`deg_C`).
+- `is_duplicate` (bool): Flag indicating duplicate sequence in dataset.
+- `is_outlier` (bool): Flag indicating unphysical outlier.
+- `data_quality_flags` (str): Comma-separated quality flags (`clean`, `duplicate`, `outlier`).
 
-## 7. `ranking.parquet` (Role 4)
-- `final_rank` (int): Final prioritised ranking order.
-- `variant_id` (str): Identifier.
-- `mutations` (str): Mutations in 5XJH numbering.
-- `confidence_tier` (str): Tier 1 (High Confidence Mechanism-Backed), Tier 2 (AI-Promising Needs Wet Lab), Tier 3 (High Risk / High Uncertainty).
-- `final_composite_score` (float): Fused score incorporating AI, uncertainty, and chemistry evidence.
-- `ai_rank` (int): Baseline AI-only rank.
-- `rank_delta` (int): Rank change after chemistry evidence incorporation ($R_{\text{AI}} - R_{\text{final}}$).
-- `chem_supported` (bool): True if candidate was validated by classical chemistry.
-- `quantum_supported` (bool): True if candidate was validated by quantum workflow.
-- `prior_art_name` (str): Known literature designation (e.g. `FAST-PETase`, `DuraPETase`, `Novel`).
-- `recommendation_reason` (str): Traceable rationale for recommendation.
-- `limitations` (str): Explicit boundaries and caveats.
+### 2.2 `predictions.parquet`
+- `row_id` (str), `variant_id` (str), `parent_enzyme` (str), `dataset_split` (str).
+- `split_role` (str): `train` or `held_out_test`.
+- `target_name` (str): `activity` or `tm`.
+- `y_true` (float): Ground truth label.
+- `y_pred_xgb` (float): XGBoost predicted value.
+- `y_pred_ridge` (float): Ridge regression predicted value.
+- `residual_xgb` (float): Residual ($y_{\text{true}} - \hat{y}_{\text{xgb}}$).
+- `residual_ridge` (float): Residual ($y_{\text{true}} - \hat{y}_{\text{ridge}}$).
+- `model_id` (str), `baseline_id` (str), `prediction_status` (str), `is_prediction` (bool).
+- `disclaimer` (str): Non-claims integrity statement.
 
-## 8. `benchmark_results.parquet` (Roles 1 & 4)
-- `arm_id` (str): Arm identifier (`A0` through `A7`).
-- `arm_name` (str): Strategy name.
-- `split` (str): Evaluation split (`test`).
-- `precision_at_5` (float): Precision@5.
-- `precision_at_10` (float): Precision@10.
-- `precision_at_20` (float): Precision@20.
-- `ci_lower_p10` (float): 95% bootstrap lower bound for Precision@10.
-- `ci_upper_p10` (float): 95% bootstrap upper bound for Precision@10.
-- `spearman_rho` (float): Rank correlation with ground truth activity.
-- `voc_efficiency` (float): Value of Chemistry per CPU hour.
-- `total_cpu_seconds` (float): Cumulative compute cost.
+### 2.3 `uncertainty.parquet`
+- `row_id` (str), `variant_id` (str), `split_role` (str), `target_name` (str), `y_true` (float).
+- `y_pred_mean` (float): Ensemble mean prediction.
+- `u_ensemble_std` (float): Disagreement across bootstrap ensemble members.
+- `conformal_lower` (float): Lower bound of 90% split-conformal interval.
+- `conformal_upper` (float): Upper bound of 90% split-conformal interval.
+- `u_conformal_width` (float): Width of conformal interval.
+- `conformal_covered` (bool): True if $y_{\text{true}} \in [y_{\text{lower}}, y_{\text{upper}}]$.
+- `u_ood_distance` (float): ESM-2 embedding distance to training distribution.
+- `ood_status` (str): `in_distribution` or `ood_warning`.
+- `u_structural_risk` (float or null): Active-site proximity risk (5XJH Ser160/His237/Asp206).
+- `structural_signal_status` (str): `available` or `missing_unmapped`.
+- `aggregate_uncertainty` (float in $[0, 1]$): Composite uncertainty score $U(x)$.
+- `gate0_status` (str): `gate0_pass` or `gate0_fail`.
+
+### 2.4 `benchmark_results.parquet`
+- `arm_id` (str): `A0`, `A1`, `A2`, `A3`, `A4`, `A5`, `A6`, `A7`.
+- `arm_name` (str): Human-readable strategy name.
+- `target_name` (str), `parent_enzyme` (str), `split_id` (str), `split_role` (str), `dataset_split` (str).
+- `n_samples` (int), `base_rate` (float), `good_variant_threshold` (float).
+- `metric_name` (str): `precision@5`, `precision@10`, `precision@20`, `enrichment_factor@10`, `ndcg@10`, `spearman_rho`, `kendall_tau`.
+- `metric_value` (float): Metric point estimate.
+- `ci_lower` (float), `ci_upper` (float): Bootstrap 95% confidence interval bounds.
+- `ci_level` (float: 0.95), `n_bootstrap` (int: 1000), `random_seed` (int: 42).
+- `compute_cost_cpu_seconds` (float).
+- `status` (str): `evaluated` (Arms A0–A2) or `pending_role2_role3_results` (Arms A3–A7).
+- `provenance` (str), `disclaimer` (str).

@@ -1,19 +1,29 @@
-model_type: "ensemble_xgboost_ridge"
-n_estimators: 100
-max_depth: 4
-learning_rate: 0.05
-ridge_alpha: 1.0
-ensemble_seeds: [42, 123, 456, 789, 999]
-conformal:
-  confidence_level: 0.90
-  method: "residual_absolute"
-uncertainty:
-  weights:
-    ensemble_variance: 0.35
-    conformal_interval: 0.25
-    ood_distance: 0.20
-    structural_risk: 0.20
-gate_0:
-  significance_alpha: 0.05
-  bootstrap_iterations: 1000
-  h1_metric: "spearman_rho_error"
+# Q-Catalyst Protein AI Model Configuration
+
+esm1v:
+  model_name: "facebook/esm1v_t33_650M_UR90S_1"
+  model_version: "v1"
+  scoring_strategy: "masked_marginal"
+  ensemble_members:
+    - "facebook/esm1v_t33_650M_UR90S_1"
+    - "facebook/esm1v_t33_650M_UR90S_2"
+    - "facebook/esm1v_t33_650M_UR90S_3"
+    - "facebook/esm1v_t33_650M_UR90S_4"
+    - "facebook/esm1v_t33_650M_UR90S_5"
+  cache_dir: "env/cache/models/esm1v"
+  device: "cpu"
+  batch_size: 1
+  max_sequence_length: 1024
+  allow_downloads_at_home: false
+  mock_fallback: true
+
+esm2:
+  embedding_model: "facebook/esm2_t6_8M_UR50D" # Lightweight test model (8M params)
+  production_model: "facebook/esm2_t33_650M_UR50D"
+  cache_dir: "env/cache/models/esm2"
+  pooling: "mean"
+
+supervised:
+  preferred_model: "xgboost"
+  comparison_baseline: "ridge"
+  random_seed: 42

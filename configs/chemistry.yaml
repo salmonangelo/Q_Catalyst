@@ -1,25 +1,59 @@
+# Q-Catalyst Role 2: Computational Chemistry Lead Configuration
+# Controls cluster construction, electrostatic embedding, PySCF parameters, and batches.
+
+project:
+  name: "Q-Catalyst"
+  subsystem: "Classical Computational Chemistry & Quantum Reference Layer"
+  lead: "Pavithran (Computational Chemistry Lead)"
+
+structures:
+  reference_wt: "data/structures/5XJH.pdb"
+  fast_petase: "data/structures/7SH6.pdb"
+  chain: "A"
+  key_residues:
+    catalytic_ser: 160
+    catalytic_his: 237
+    catalytic_asp: 206
+    oxyanion_met: 161
+    oxyanion_tyr: 87
+
 cluster:
-  name: "PETase_reduced_active_site"
-  reference_structure: "5XJH"
-  triad_residues: [160, 206, 237]
-  oxyanion_residues: [87, 161]
-  substrate: "MHET_dimer_model"
-  capping: "ACE_NME"
-methods:
-  tier_s:
-    method: "B3LYP-D3"
-    basis: "def2-SVP"
-    solvent: "CPCM(water)"
-    convergence_energy_hartree: 1.0e-6
-  tier_m:
-    method: "wB97X-D"
-    basis: "def2-TZVP"
-    convergence_energy_hartree: 1.0e-7
-descriptors:
-  - "d_attack_ser160_c_ester"
-  - "d_hbond_his237_ser160"
-  - "d_hbond_asp206_his237"
-  - "esp_active_site_au"
-  - "delta_e_int_kcal_mol"
-  - "homo_lumo_gap_ev"
-  - "ts_stabilization_proxy_kcal_mol"
+  tier: "Tier S"
+  target_atoms: 42
+  charge: -1
+  spin: 0
+  fragments:
+    ser160: "methanol-like (cut at CA, capped with 3 H)"
+    his237: "4-methylimidazole (cut at CA, capped with 3 H)"
+    asp206: "acetate (cut at CA, capped with 3 H)"
+    oxyanion_donor: "Met161 backbone formamide peptide model"
+    substrate_model: "methyl acetate (PET ester fragment)"
+
+embedding:
+  method: "QM/MM point-charge electrostatic embedding"
+  force_field: "AMBER ff14SB"
+  default_radius_cutoff_A: 10.0
+  sensitivity_radii_A: [6.0, 8.0, 10.0, 12.0]
+
+electronic_structure:
+  engine: "PySCF"
+  basis: "def2-SVP"
+  basis_sensitivity: "def2-TZVP"
+  functional: "b3lyp"
+  functional_sensitivity: "wb97x-d"
+  density_fitting: true
+  conv_tol: 1.0e-6
+  max_wall_clock_sec_per_variant: 180.0
+
+quantum_reference:
+  method: "CASCI"
+  active_space_orbitals: 4
+  active_space_electrons: 4
+  qubits_parity_mapping: 6
+  target_role: "Role 3 (Quantum Lead)"
+  output_answer_key: "results/quantum/casci_control_role3.json"
+
+batches:
+  gated_arm_a4_budget: 15
+  random_control_arm_a3_budget: 15
+  quantum_arm_a5_budget: 5
