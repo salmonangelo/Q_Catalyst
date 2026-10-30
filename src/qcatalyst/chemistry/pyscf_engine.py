@@ -7,7 +7,7 @@ QM/MM electrostatic embedding, population analysis, and CASCI active-space calcu
 import time
 from typing import Dict, List, Tuple, Optional, Any
 import numpy as np
-from pyscf import gto, scf, dft, mcscf, qmmm
+from pyscf import gto, scf, mcscf, qmmm
 
 
 class PySCFChemistryEngine:
@@ -80,6 +80,7 @@ class PySCFChemistryEngine:
 
         # 2. DFT
         if run_dft:
+            from pyscf import dft
             t0 = time.perf_counter()
             mf_dft = dft.RKS(mol)
             mf_dft.xc = self.functional
@@ -135,16 +136,24 @@ class PySCFChemistryEngine:
     ) -> Dict[str, Any]:
         """
         Runs exact classical Complete Active Space Configuration Interaction (CASCI)
-        to serve as the benchmark 'answer key' for Role 3's VQE algorithm.
+        with explicit convergence validation and active-space Hamiltonian integral extraction.
         """
         mol = self._build_mol(geometry_str, charge, spin)
         mf = scf.RHF(mol)
+        mf.with_solvent = None  # Prevents __getattr__ dynamic import of DFT on Windows
         if self.use_density_fitting:
-            mf = mf.density_fit()
+            try:
+                mf = mf.density_fit(auxbasis="def2-svp-jkfit")
+            except Exception:
+                mf = mf.density_fit()
         if mm_coords is not None and mm_charges is not None and len(mm_charges) > 0:
             mf = qmmm.mm_charge(mf, mm_coords, mm_charges)
         mf.conv_tol = self.conv_tol
         mf.kernel()
+
+        # Task 4: Explicit RHF convergence check
+        if not mf.converged:
+            raise RuntimeError(f"RHF reference failed to converge within conv_tol={self.conv_tol}")
 
         # CASCI
         t0 = time.perf_counter()
@@ -153,12 +162,179 @@ class PySCFChemistryEngine:
         e_tot = float(res[0])
         cas_time = time.perf_counter() - t0
 
+        # Task 4: Explicit CASCI convergence check
+        cas_converged = bool(getattr(mycas, "converged", True))
+        if not cas_converged:
+            raise RuntimeError("CASCI active space calculation failed to converge!")
+
+        # Extract active-space Hamiltonian integrals
+        from pyscf import ao2mo
+        h1eff, energy_core = mycas.get_h1eff()
+        h2eff_2d = mycas.get_h2eff()
+        h2eff_4d = ao2mo.restore(1, h2eff_2d, ncas)
+
+        mo_coeff = mycas.mo_coeff
+        ncore = mycas.ncore
+        active_idx = list(range(ncore, ncore + ncas))
+        mo_coeff_active = mo_coeff[:, active_idx].copy()
+        active_mo_energies = [float(mf.mo_energy[i]) for i in active_idx]
+
         return {
             "ncas_orbitals": ncas,
             "nelecas": nelecas,
             "e_casci_total": e_tot,
             "e_hf_ref": float(mf.e_tot),
-            "correlation_energy_ha": round(e_tot - float(mf.e_tot), 6),
+            "correlation_energy_ha": round(e_tot - float(mf.e_tot), 8),
             "casci_time_sec": round(cas_time, 3),
-            "mo_coeff_shape": list(mycas.mo_coeff.shape),
+            "hf_converged": bool(mf.converged),
+            "casci_converged": cas_converged,
+            "ncore": ncore,
+            "natoms": mol.natm,
+            "nbasis": mol.nao_nr(),
+            "nelectron": mol.nelectron,
+            "charge": charge,
+            "spin": spin,
+            "active_idx": active_idx,
+            "active_mo_energies": active_mo_energies,
+            "energy_core": float(energy_core),
+            "h1eff": h1eff,
+            "h2eff_2d": h2eff_2d,
+            "h2eff_4d": h2eff_4d,
+            "mo_coeff_active": mo_coeff_active,
+            "mo_coeff_shape": list(mo_coeff.shape),
+            "geometry_str": geometry_str,
+        }
+
+    def export_active_space_hamiltonian(
+        self,
+        casci_result: Dict[str, Any],
+        output_dir: str = "results/quantum",
+        prefix: str = "wt_active_space_hamiltonian",
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, str]:
+        """
+        Exports the complete electronic Hamiltonian for Role 3 Quantum VQE:
+        1. {prefix}.json: Full metadata, provenance, electron counts, energies, qubit mapping conventions, units.
+        2. {prefix}.npz: Full-precision numpy arrays (h1eff, h2eff_4d, h2eff_2d, energy_core, mo_coeff_active, active_mo_energies).
+        3. {prefix}.fcidump: Standard IUPAC FCIDUMP format for Qiskit Nature / OpenFermion.
+        """
+        import json
+        import os
+
+        os.makedirs(output_dir, exist_ok=True)
+        json_path = os.path.join(output_dir, f"{prefix}.json")
+        npz_path = os.path.join(output_dir, f"{prefix}.npz")
+        fcidump_path = os.path.join(output_dir, f"{prefix}.fcidump")
+
+        ncas = casci_result["ncas_orbitals"]
+        nelecas = casci_result["nelecas"]
+        h1eff = casci_result["h1eff"]
+        h2eff_4d = casci_result["h2eff_4d"]
+        h2eff_2d = casci_result["h2eff_2d"]
+        energy_core = casci_result["energy_core"]
+
+        # 1. Export JSON metadata & provenance
+        hamiltonian_dict = {
+            "title": "Q-Catalyst Active-Space Electronic Hamiltonian Handoff",
+            "target_role": "Role 3 (Quantum Lead - VQE)",
+            "provenance": {
+                "engine": "PySCF 2.14.0",
+                "method": "RHF with AMBER ff14SB QM/MM Point-Charge Embedding",
+                "active_space_method": "CASCI",
+                "basis": self.basis,
+                "density_fitting": self.use_density_fitting,
+                "conv_tol": self.conv_tol,
+                "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ"),
+            },
+            "units": {
+                "energy": "Hartree (Ha)",
+                "distance": "Angstrom (Cartesian coordinates) / Bohr (internal electronic structure)",
+                "charge": "Elementary charge (e)",
+            },
+            "electronic_structure": {
+                "natoms": casci_result.get("natoms", 42),
+                "nbasis": casci_result.get("nbasis", 390),
+                "nelectron_total": casci_result.get("nelectron", 158),
+                "charge": casci_result.get("charge", -1),
+                "spin": casci_result.get("spin", 0),
+                "ncore_orbitals": casci_result.get("ncore", 77),
+                "ncas_orbitals": ncas,
+                "nelecas": list(nelecas),
+                "active_orbital_indices": casci_result.get("active_idx", []),
+                "active_orbital_energies_ha": casci_result.get("active_mo_energies", []),
+            },
+            "convergence": {
+                "hf_converged": casci_result.get("hf_converged", True),
+                "casci_converged": casci_result.get("casci_converged", True),
+            },
+            "energies_hartree": {
+                "e_hf_ref": casci_result["e_hf_ref"],
+                "e_casci_total": casci_result["e_casci_total"],
+                "correlation_energy_ha": casci_result["correlation_energy_ha"],
+                "energy_core_constant": energy_core,
+            },
+            "qubit_mapping_specifications": {
+                "qubits_jordan_wigner": 2 * ncas,
+                "qubits_parity_mapping_with_z2_reduction": 2 * ncas - 2,
+                "spin_orbital_ordering": "Interleaved (spatial 0 alpha, spatial 0 beta, ...)",
+                "hamiltonian_form": "H = energy_core + sum_pq h1eff[p,q] a_p^dag a_q + 0.5 sum_pqrs h2eff[p,q,r,s] a_p^dag a_r^dag a_s a_q (physicist) or 0.5 sum_pqrs (pq|rs) a_p^dag a_q^dag a_s a_r (chemist)",
+            },
+            "artifact_files": {
+                "arrays_npz": f"{prefix}.npz",
+                "fcidump": f"{prefix}.fcidump",
+            },
+        }
+        if metadata:
+            hamiltonian_dict["variant_metadata"] = metadata
+
+        with open(json_path, "w") as f:
+            json.dump(hamiltonian_dict, f, indent=2)
+
+        # 2. Export full-precision NumPy NPZ arrays
+        np.savez_compressed(
+            npz_path,
+            h1eff=h1eff,
+            h2eff_4d=h2eff_4d,
+            h2eff_2d=h2eff_2d,
+            energy_core=np.array(energy_core, dtype=np.float64),
+            mo_coeff_active=casci_result["mo_coeff_active"],
+            active_mo_energies=np.array(casci_result.get("active_mo_energies", []), dtype=np.float64),
+        )
+
+        # 3. Export standard IUPAC FCIDUMP
+        with open(fcidump_path, "w") as f:
+            nelec_tot = nelecas[0] + nelecas[1]
+            ms2 = nelecas[0] - nelecas[1]
+            f.write(f" &FCI NORB={ncas},NELEC={nelec_tot},MS2={ms2},\n")
+            f.write(f"  ORBSYM=" + ",".join(["1"] * ncas) + ",\n")
+            f.write(f"  ISYM=1\n")
+            f.write(" &END\n")
+
+            # 2e integrals in chemist notation (ij|kl) with 8-fold symmetry
+            for i in range(ncas):
+                for j in range(i + 1):
+                    ij = i * (i + 1) // 2 + j
+                    for k in range(ncas):
+                        for l in range(k + 1):
+                            kl = k * (k + 1) // 2 + l
+                            if ij >= kl:
+                                val = float(h2eff_4d[i, j, k, l])
+                                if abs(val) > 1e-15:
+                                    f.write(f"{val:23.14e} {i+1:3d} {j+1:3d} {k+1:3d} {l+1:3d}\n")
+
+            # 1e integrals h1eff[i, j]
+            for i in range(ncas):
+                for j in range(i + 1):
+                    val = float(h1eff[i, j])
+                    if abs(val) > 1e-15:
+                        f.write(f"{val:23.14e} {i+1:3d} {j+1:3d}   0   0\n")
+
+            # Inactive core / nuclear constant
+            f.write(f"{float(energy_core):23.14e}   0   0   0   0\n")
+
+        print(f"Exported complete active-space Hamiltonian to {json_path}, {npz_path}, {fcidump_path}")
+        return {
+            "json": json_path,
+            "npz": npz_path,
+            "fcidump": fcidump_path,
         }

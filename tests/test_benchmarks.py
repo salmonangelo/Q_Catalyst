@@ -7,6 +7,7 @@ import pandas as pd
 import pytest
 
 from qcatalyst.evaluation.benchmarks import (
+    load_quantum_results,
     run_benchmark_suite,
     save_benchmark_artifacts,
     score_arm_a0_random,
@@ -200,3 +201,145 @@ def test_save_benchmark_artifacts(tmp_path: Path):
     reloaded = pd.read_parquet(parquet_file)
     assert len(reloaded) == len(df)
     assert "precision@10" in reloaded["metric_name"].values
+
+
+# -------------------------------------------------------------
+# Role 3 Quantum Results Loader Unit and Contract Tests
+# -------------------------------------------------------------
+def test_load_quantum_results_success():
+    """Verify successful loading and validation of the exported WT quantum results Parquet."""
+    quantum_file = Path("results/quantum/quantum_results.parquet")
+    if not quantum_file.exists():
+        pytest.skip("results/quantum/quantum_results.parquet does not exist.")
+
+    df = load_quantum_results(quantum_file)
+
+    assert isinstance(df, pd.DataFrame)
+    assert len(df) == 1
+    row = df.iloc[0]
+
+    # Verify WT identity and role
+    assert row["variant_id"] == "VAR_WT"
+    assert row["mutation"] == "WT"
+    assert row["active_space"] == "CAS(4e,4o)"
+
+    # Verify finite energy values
+    casci_energy = float(row["quantum_casci_reference_energy_hartree"])
+    vqe_energy = float(row["vqe_energy_hartree"])
+    reported_error = float(row["absolute_vqe_error_hartree"])
+    assert np.isfinite(casci_energy)
+    assert np.isfinite(vqe_energy)
+    assert np.isfinite(reported_error)
+
+    # Verify numerical error consistency within 1e-10 Ha tolerance
+    expected_error = abs(vqe_energy - casci_energy)
+    assert abs(reported_error - expected_error) <= 1e-10
+
+    # Test default path parameter
+    df_default = load_quantum_results()
+    assert len(df_default) == 1
+    assert df_default.iloc[0]["variant_id"] == "VAR_WT"
+
+
+def test_load_quantum_results_missing_file(tmp_path: Path):
+    """Verify load_quantum_results raises FileNotFoundError when file does not exist."""
+    missing_path = tmp_path / "nonexistent_results.parquet"
+    with pytest.raises(FileNotFoundError, match="Quantum results Parquet file not found"):
+        load_quantum_results(missing_path)
+
+
+def test_load_quantum_results_missing_columns(tmp_path: Path):
+    """Verify load_quantum_results raises ValueError when required contract columns are missing."""
+    base_file = Path("results/quantum/quantum_results.parquet")
+    if not base_file.exists():
+        pytest.skip("results/quantum/quantum_results.parquet does not exist.")
+
+    base_df = pd.read_parquet(base_file)
+    # Drop one required contract column
+    corrupt_df = base_df.drop(columns=["vqe_energy_hartree"])
+    bad_path = tmp_path / "missing_vqe_column.parquet"
+    corrupt_df.to_parquet(bad_path)
+
+    with pytest.raises(ValueError, match="missing required contract columns"):
+        load_quantum_results(bad_path)
+
+
+def test_load_quantum_results_duplicate_wt_records(tmp_path: Path):
+    """Verify load_quantum_results raises ValueError when multiple WT records are present."""
+    base_file = Path("results/quantum/quantum_results.parquet")
+    if not base_file.exists():
+        pytest.skip("results/quantum/quantum_results.parquet does not exist.")
+
+    base_df = pd.read_parquet(base_file)
+    duplicate_df = pd.concat([base_df, base_df], ignore_index=True)
+    dup_path = tmp_path / "duplicate_wt.parquet"
+    duplicate_df.to_parquet(dup_path)
+
+    with pytest.raises(ValueError, match="Expected exactly one 'VAR_WT' reference record"):
+        load_quantum_results(dup_path)
+
+
+def test_load_quantum_results_missing_wt_record(tmp_path: Path):
+    """Verify load_quantum_results raises ValueError when no VAR_WT record is found."""
+    base_file = Path("results/quantum/quantum_results.parquet")
+    if not base_file.exists():
+        pytest.skip("results/quantum/quantum_results.parquet does not exist.")
+
+    base_df = pd.read_parquet(base_file)
+    mutant_only_df = base_df.copy()
+    mutant_only_df["variant_id"] = "VAR_S92A"
+    mutant_path = tmp_path / "no_wt.parquet"
+    mutant_only_df.to_parquet(mutant_path)
+
+    with pytest.raises(ValueError, match="must contain a 'VAR_WT' reference record"):
+        load_quantum_results(mutant_path)
+
+
+def test_load_quantum_results_inconsistent_energy_error(tmp_path: Path):
+    """Verify load_quantum_results raises ValueError when absolute_vqe_error_hartree is inconsistent."""
+    base_file = Path("results/quantum/quantum_results.parquet")
+    if not base_file.exists():
+        pytest.skip("results/quantum/quantum_results.parquet does not exist.")
+
+    base_df = pd.read_parquet(base_file)
+    bad_error_df = base_df.copy()
+    # Inconsistent error: true diff is ~2.4e-5 Ha, set to 0.5 Ha
+    bad_error_df["absolute_vqe_error_hartree"] = 0.5
+    bad_err_path = tmp_path / "bad_error.parquet"
+    bad_error_df.to_parquet(bad_err_path)
+
+    with pytest.raises(ValueError, match="Inconsistent absolute_vqe_error_hartree"):
+        load_quantum_results(bad_err_path)
+
+
+def test_load_quantum_results_non_finite_energies(tmp_path: Path):
+    """Verify load_quantum_results raises ValueError when energies are NaN or infinite."""
+    base_file = Path("results/quantum/quantum_results.parquet")
+    if not base_file.exists():
+        pytest.skip("results/quantum/quantum_results.parquet does not exist.")
+
+    base_df = pd.read_parquet(base_file)
+    nan_df = base_df.copy()
+    nan_df["vqe_energy_hartree"] = np.nan
+    nan_path = tmp_path / "nan_vqe.parquet"
+    nan_df.to_parquet(nan_path)
+
+    with pytest.raises(ValueError, match="must be finite numbers"):
+        load_quantum_results(nan_path)
+
+
+def test_load_quantum_results_invalid_dtype(tmp_path: Path):
+    """Verify load_quantum_results raises TypeError when data types are not numeric."""
+    base_file = Path("results/quantum/quantum_results.parquet")
+    if not base_file.exists():
+        pytest.skip("results/quantum/quantum_results.parquet does not exist.")
+
+    base_df = pd.read_parquet(base_file)
+    bad_type_df = base_df.copy()
+    bad_type_df["ansatz_parameters"] = "twenty_six"
+    bad_type_path = tmp_path / "bad_dtype.parquet"
+    bad_type_df.to_parquet(bad_type_path)
+
+    with pytest.raises(TypeError, match="must have a numeric integer data type"):
+        load_quantum_results(bad_type_path)
+
