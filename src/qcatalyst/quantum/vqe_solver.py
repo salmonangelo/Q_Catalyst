@@ -3,7 +3,10 @@ Quantum electronic-structure solver: CASCI classical reference and VQE simulator
 """
 from typing import Dict, List, Any, Tuple
 import numpy as np
-import pandas as pd
+try:
+    import pandas as pd
+except ImportError:
+    pd = None
 from scipy.optimize import minimize
 
 HARTREE_TO_KCAL_MOL = 627.509474
