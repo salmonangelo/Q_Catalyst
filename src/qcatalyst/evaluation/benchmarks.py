@@ -241,6 +241,7 @@ def run_benchmark_suite(
     random_seed: int = 42,
     n_bootstrap: int = 1000,
     mock_esm: bool = True,
+    quantum_results_path: str | Path | None = Path("results/quantum/quantum_results.parquet"),
 ) -> pd.DataFrame:
     """Execute complete benchmarking across arms A0, A1, and A2 on held-out split.
 
@@ -254,6 +255,8 @@ def run_benchmark_suite(
         random_seed: Seed for reproducibility.
         n_bootstrap: Number of bootstrap resamples.
         mock_esm: Whether to use deterministic ESM proxy.
+        quantum_results_path: Optional path to Role 3 quantum results Parquet file
+            (default: results/quantum/quantum_results.parquet).
 
     Returns:
         DataFrame of benchmark records across all arms and metrics.
@@ -403,17 +406,14 @@ def run_benchmark_suite(
         )
 
     # -------------------------------------------------------------
-    # Arms A3–A7: Pending Downstream Chemistry & Quantum Outputs
+    # Arms A3–A4: Pending Downstream Classical Chemistry Outputs
     # (Strictly no invented results per scientific ethics policy)
     # -------------------------------------------------------------
-    pending_arms = [
+    pending_chem_arms = [
         ("A3", "AI + Random Classical Chemistry (PySCF)", "Role 2 PySCF cluster calculations"),
         ("A4", "AI + Uncertainty-Gated Chemistry", "Role 1 Gate 0 + Role 2 PySCF"),
-        ("A5", "AI + CASCI Exact Quantum Control", "Role 3 CASCI exact reference"),
-        ("A6", "AI + Noiseless VQE Simulator", "Role 3 noiseless VQE statevector"),
-        ("A7", "AI + Noisy VQE Simulator", "Role 3 noisy Aer simulator VQE"),
     ]
-    for arm_id, arm_name, prov in pending_arms:
+    for arm_id, arm_name, prov in pending_chem_arms:
         records.append(
             BenchmarkRecord(
                 arm_id=arm_id,
@@ -438,6 +438,182 @@ def run_benchmark_suite(
                 provenance=prov,
             ).to_dict()
         )
+
+    # -------------------------------------------------------------
+    # Arms A5–A7: Role 3 Quantum Active-Space Integration
+    # -------------------------------------------------------------
+    quantum_df = None
+    if quantum_results_path is not None:
+        q_path = Path(quantum_results_path)
+        if not q_path.exists():
+            raise FileNotFoundError(f"Quantum results Parquet file not found at: {q_path}")
+        quantum_df = load_quantum_results(q_path)
+
+        # Validate duplicate mutant IDs
+        mutants_check = quantum_df[quantum_df["variant_id"] != "VAR_WT"]
+        if mutants_check["variant_id"].duplicated().any():
+            dups = mutants_check["variant_id"][mutants_check["variant_id"].duplicated()].unique().tolist()
+            raise ValueError(f"Duplicate mutant variant IDs detected in quantum results: {dups}")
+
+    evaluate_quantum = False
+    if quantum_df is not None:
+        # Separate external reference anchor WT (Requirement 5)
+        wt_anchor = quantum_df[quantum_df["variant_id"] == "VAR_WT"].iloc[0]
+        casci_wt = float(wt_anchor["quantum_casci_reference_energy_hartree"])
+        vqe_wt = float(wt_anchor["vqe_energy_hartree"])
+
+        mutant_df = quantum_df[quantum_df["variant_id"] != "VAR_WT"].copy()
+
+        # Join mutants with held-out test split
+        q_matched = test_u[["variant_id", "y_true", "order_idx"]].merge(
+            mutant_df, on="variant_id", how="inner"
+        ).sort_values("order_idx").reset_index(drop=True)
+
+        if q_matched.empty and "mutation" in mutant_df.columns:
+            if "mutations_canonical" in matched_variants.columns:
+                mv_map = matched_variants[["variant_id", "mutations_canonical", "order_idx"]].dropna()
+                mutant_mapped = mutant_df.merge(
+                    mv_map.rename(columns={"mutations_canonical": "mutation"}),
+                    on="mutation",
+                    how="inner",
+                    suffixes=("_q", ""),
+                )
+                if not mutant_mapped.empty:
+                    q_matched = test_u[["variant_id", "y_true"]].merge(
+                        mutant_mapped, on="variant_id", how="inner"
+                    ).sort_values("order_idx").reset_index(drop=True)
+
+        if len(q_matched) >= 2:
+            evaluate_quantum = True
+            n_q = len(q_matched)
+            y_true_q = q_matched["y_true"].to_numpy(dtype=np.float64)
+            base_rate_q = float(np.mean(y_true_q > good_threshold))
+
+            # Relative quantum stabilization scores: -(E_mut - E_wt) = E_wt - E_mut
+            casci_mut = q_matched["quantum_casci_reference_energy_hartree"].to_numpy(dtype=np.float64)
+            scores_a5 = -(casci_mut - casci_wt)
+
+            vqe_mut = q_matched["vqe_energy_hartree"].to_numpy(dtype=np.float64)
+            scores_a6 = -(vqe_mut - vqe_wt)
+
+            # Arm A5: CASCI Exact Quantum Control
+            metrics_a5 = evaluate_all_ranking_metrics(
+                y_true_q, scores_a5, threshold=good_threshold, n_bootstrap=n_bootstrap, seed=random_seed
+            )
+            for m_name, m_dict in metrics_a5.items():
+                records.append(
+                    BenchmarkRecord(
+                        arm_id="A5",
+                        arm_name="AI + CASCI Exact Quantum Control",
+                        target_name=target_name,
+                        parent_enzyme=enzyme,
+                        split_id="single_to_multi",
+                        split_role="held_out_test",
+                        dataset_split="low-to-high-mutant",
+                        n_samples=n_q,
+                        base_rate=round(base_rate_q, 4),
+                        good_variant_threshold=good_threshold,
+                        metric_name=m_name,
+                        metric_value=round(m_dict["value"], 4),
+                        ci_lower=round(m_dict["ci_lower"], 4),
+                        ci_upper=round(m_dict["ci_upper"], 4),
+                        ci_level=0.95,
+                        n_bootstrap=n_bootstrap,
+                        random_seed=random_seed,
+                        compute_cost_cpu_seconds=0.0,
+                        status="evaluated",
+                        provenance="Role 3 active-space CASCI reference energies relative to WT anchor",
+                    ).to_dict()
+                )
+
+            # Arm A6: Noiseless VQE Simulator
+            metrics_a6 = evaluate_all_ranking_metrics(
+                y_true_q, scores_a6, threshold=good_threshold, n_bootstrap=n_bootstrap, seed=random_seed
+            )
+            for m_name, m_dict in metrics_a6.items():
+                records.append(
+                    BenchmarkRecord(
+                        arm_id="A6",
+                        arm_name="AI + Noiseless VQE Simulator",
+                        target_name=target_name,
+                        parent_enzyme=enzyme,
+                        split_id="single_to_multi",
+                        split_role="held_out_test",
+                        dataset_split="low-to-high-mutant",
+                        n_samples=n_q,
+                        base_rate=round(base_rate_q, 4),
+                        good_variant_threshold=good_threshold,
+                        metric_name=m_name,
+                        metric_value=round(m_dict["value"], 4),
+                        ci_lower=round(m_dict["ci_lower"], 4),
+                        ci_upper=round(m_dict["ci_upper"], 4),
+                        ci_level=0.95,
+                        n_bootstrap=n_bootstrap,
+                        random_seed=random_seed,
+                        compute_cost_cpu_seconds=0.0,
+                        status="evaluated",
+                        provenance="Role 3 noiseless UCCSD statevector VQE energies relative to WT anchor",
+                    ).to_dict()
+                )
+
+    if not evaluate_quantum:
+        # Either quantum_df is None or contains only VAR_WT anchor (or insufficient matching mutants)
+        q_pending_arms = [
+            ("A5", "AI + CASCI Exact Quantum Control", "Role 3 CASCI exact reference (only VAR_WT anchor available; candidate metrics unavailable)"),
+            ("A6", "AI + Noiseless VQE Simulator", "Role 3 noiseless VQE statevector (only VAR_WT anchor available; candidate metrics unavailable)"),
+        ]
+        pending_status = "pending_mutant_quantum_results" if quantum_df is not None else "pending_role2_role3_results"
+        for arm_id, arm_name, prov in q_pending_arms:
+            records.append(
+                BenchmarkRecord(
+                    arm_id=arm_id,
+                    arm_name=arm_name,
+                    target_name=target_name,
+                    parent_enzyme=enzyme,
+                    split_id="single_to_multi",
+                    split_role="held_out_test",
+                    dataset_split="low-to-high-mutant",
+                    n_samples=n_eval,
+                    base_rate=round(base_rate, 4),
+                    good_variant_threshold=good_threshold,
+                    metric_name="precision@10",
+                    metric_value=np.nan,
+                    ci_lower=np.nan,
+                    ci_upper=np.nan,
+                    ci_level=0.95,
+                    n_bootstrap=n_bootstrap,
+                    random_seed=random_seed,
+                    compute_cost_cpu_seconds=0.0,
+                    status=pending_status,
+                    provenance=prov,
+                ).to_dict()
+            )
+
+    # Arm A7: Noisy VQE Simulator remains strictly pending until genuine noisy simulation exists (Requirement 6)
+    records.append(
+        BenchmarkRecord(
+            arm_id="A7",
+            arm_name="AI + Noisy VQE Simulator",
+            target_name=target_name,
+            parent_enzyme=enzyme,
+            split_id="single_to_multi",
+            split_role="held_out_test",
+            dataset_split="low-to-high-mutant",
+            n_samples=n_eval,
+            base_rate=round(base_rate, 4),
+            good_variant_threshold=good_threshold,
+            metric_name="precision@10",
+            metric_value=np.nan,
+            ci_lower=np.nan,
+            ci_upper=np.nan,
+            ci_level=0.95,
+            n_bootstrap=n_bootstrap,
+            random_seed=random_seed,
+            compute_cost_cpu_seconds=0.0,
+            status="pending_noisy_vqe_data",
+            provenance="Role 3 noisy Aer simulator VQE (pending genuine noisy simulation data)",
+        ).to_dict()
+    )
 
     df_results = pd.DataFrame(records)
     return df_results
@@ -475,19 +651,21 @@ def save_benchmark_artifacts(
         "|---|---|---|---|---|---|---|---|---|",
     ]
 
-    for arm in ["A0", "A1", "A2"]:
+    evaluated_arms = [arm for arm in ["A0", "A1", "A2", "A5", "A6"] if arm in eval_df["arm_id"].values]
+    for arm in evaluated_arms:
         sub = eval_df[eval_df["arm_id"] == arm].set_index("metric_name")
-        name = sub["arm_name"].iloc[0]
-        p5 = sub.loc["precision@5", "metric_value"]
-        p10 = sub.loc["precision@10", "metric_value"]
-        p20 = sub.loc["precision@20", "metric_value"]
-        ef10 = sub.loc["enrichment_factor@10", "metric_value"]
-        ndcg10 = sub.loc["ndcg@10", "metric_value"]
-        rho = sub.loc["spearman_rho", "metric_value"]
-        tau = sub.loc["kendall_tau", "metric_value"]
-        report_lines.append(
-            f"| **{arm}** | {name} | **{p5:.2f}** | **{p10:.2f}** | **{p20:.2f}** | **{ef10:.2f}x** | {ndcg10:.3f} | {rho:.3f} | {tau:.3f} |"
-        )
+        if "precision@10" in sub.index:
+            name = sub["arm_name"].iloc[0]
+            p5 = sub.loc["precision@5", "metric_value"] if "precision@5" in sub.index else np.nan
+            p10 = sub.loc["precision@10", "metric_value"] if "precision@10" in sub.index else np.nan
+            p20 = sub.loc["precision@20", "metric_value"] if "precision@20" in sub.index else np.nan
+            ef10 = sub.loc["enrichment_factor@10", "metric_value"] if "enrichment_factor@10" in sub.index else np.nan
+            ndcg10 = sub.loc["ndcg@10", "metric_value"] if "ndcg@10" in sub.index else np.nan
+            rho = sub.loc["spearman_rho", "metric_value"] if "spearman_rho" in sub.index else np.nan
+            tau = sub.loc["kendall_tau", "metric_value"] if "kendall_tau" in sub.index else np.nan
+            report_lines.append(
+                f"| **{arm}** | {name} | **{p5:.2f}** | **{p10:.2f}** | **{p20:.2f}** | **{ef10:.2f}x** | {ndcg10:.3f} | {rho:.3f} | {tau:.3f} |"
+            )
 
     report_lines.extend([
         "",

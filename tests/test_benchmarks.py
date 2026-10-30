@@ -165,9 +165,10 @@ def test_benchmark_suite_real_dataset_integrity():
     assert np.all(np.isfinite(eval_df["metric_value"]))
 
     # Check pending arms (A3–A7 must NOT have invented numbers)
-    pending_df = df_results[df_results["status"] == "pending_role2_role3_results"]
+    pending_df = df_results[df_results["status"].str.startswith("pending")]
     assert len(pending_df) == 5
     assert np.all(np.isnan(pending_df["metric_value"]))
+    assert set(pending_df["arm_id"]) == {"A3", "A4", "A5", "A6", "A7"}
 
 
 def test_save_benchmark_artifacts(tmp_path: Path):
@@ -342,4 +343,163 @@ def test_load_quantum_results_invalid_dtype(tmp_path: Path):
 
     with pytest.raises(TypeError, match="must have a numeric integer data type"):
         load_quantum_results(bad_type_path)
+
+
+# -------------------------------------------------------------
+# Quantum Result Integration Tests in run_benchmark_suite
+# -------------------------------------------------------------
+def test_benchmark_suite_wt_only():
+    """Verify that a quantum results Parquet containing only VAR_WT marks A5/A6 as pending."""
+    variants_path = Path("data/curated/variants.parquet")
+    preds_path = Path("results/predictions/predictions.parquet")
+    uncert_path = Path("results/uncertainty/uncertainty.parquet")
+    quantum_file = Path("results/quantum/quantum_results.parquet")
+
+    if not uncert_path.exists() or not quantum_file.exists():
+        pytest.skip("Required benchmark data files do not exist.")
+
+    df_results = run_benchmark_suite(
+        variants_path=variants_path,
+        predictions_path=preds_path,
+        uncertainty_path=uncert_path,
+        quantum_results_path=quantum_file,
+        n_bootstrap=50,
+        random_seed=42,
+    )
+
+    # WT anchor must NOT be added to held-out test ranking
+    assert "VAR_WT" not in df_results["target_name"].values
+
+    # A5 and A6 must report pending candidate metrics
+    a5_rows = df_results[df_results["arm_id"] == "A5"]
+    a6_rows = df_results[df_results["arm_id"] == "A6"]
+    a7_rows = df_results[df_results["arm_id"] == "A7"]
+
+    assert len(a5_rows) == 1
+    assert a5_rows.iloc[0]["status"] == "pending_mutant_quantum_results"
+    assert np.isnan(a5_rows.iloc[0]["metric_value"])
+
+    assert len(a6_rows) == 1
+    assert a6_rows.iloc[0]["status"] == "pending_mutant_quantum_results"
+    assert np.isnan(a6_rows.iloc[0]["metric_value"])
+
+    # A7 must remain pending noisy VQE data
+    assert len(a7_rows) == 1
+    assert a7_rows.iloc[0]["status"] == "pending_noisy_vqe_data"
+    assert np.isnan(a7_rows.iloc[0]["metric_value"])
+
+
+def test_benchmark_suite_missing_quantum_results(tmp_path: Path):
+    """Verify run_benchmark_suite raises FileNotFoundError when quantum file does not exist."""
+    variants_path = Path("data/curated/variants.parquet")
+    preds_path = Path("results/predictions/predictions.parquet")
+    uncert_path = Path("results/uncertainty/uncertainty.parquet")
+
+    if not uncert_path.exists():
+        pytest.skip("results/uncertainty/uncertainty.parquet does not exist.")
+
+    missing_file = tmp_path / "nonexistent_quantum.parquet"
+    with pytest.raises(FileNotFoundError, match="Quantum results Parquet file not found"):
+        run_benchmark_suite(
+            variants_path=variants_path,
+            predictions_path=preds_path,
+            uncertainty_path=uncert_path,
+            quantum_results_path=missing_file,
+        )
+
+
+def test_benchmark_suite_duplicate_mutant_variants(tmp_path: Path):
+    """Verify run_benchmark_suite raises ValueError when duplicate mutant variant IDs exist."""
+    variants_path = Path("data/curated/variants.parquet")
+    preds_path = Path("results/predictions/predictions.parquet")
+    uncert_path = Path("results/uncertainty/uncertainty.parquet")
+    quantum_file = Path("results/quantum/quantum_results.parquet")
+
+    if not uncert_path.exists() or not quantum_file.exists():
+        pytest.skip("Required benchmark data files do not exist.")
+
+    base_df = pd.read_parquet(quantum_file)
+    # Synthesize two mutant rows with duplicate variant_id
+    mut_row1 = base_df.iloc[0].copy()
+    mut_row1["variant_id"] = "IsPETase_W159H"
+    mut_row1["mutation"] = "W159H"
+
+    mut_row2 = base_df.iloc[0].copy()
+    mut_row2["variant_id"] = "IsPETase_W159H"
+    mut_row2["mutation"] = "W159H"
+
+    dup_df = pd.concat([base_df, pd.DataFrame([mut_row1, mut_row2])], ignore_index=True)
+    dup_path = tmp_path / "duplicate_mutants.parquet"
+    dup_df.to_parquet(dup_path)
+
+    with pytest.raises(ValueError, match="Duplicate mutant variant IDs detected in quantum results"):
+        run_benchmark_suite(
+            variants_path=variants_path,
+            predictions_path=preds_path,
+            uncertainty_path=uncert_path,
+            quantum_results_path=dup_path,
+        )
+
+
+def test_benchmark_suite_valid_matching_mutants(tmp_path: Path):
+    """Verify run_benchmark_suite successfully evaluates Arms A5 and A6 with matching mutants."""
+    variants_path = Path("data/curated/variants.parquet")
+    preds_path = Path("results/predictions/predictions.parquet")
+    uncert_path = Path("results/uncertainty/uncertainty.parquet")
+    quantum_file = Path("results/quantum/quantum_results.parquet")
+
+    if not uncert_path.exists() or not quantum_file.exists():
+        pytest.skip("Required benchmark data files do not exist.")
+
+    base_df = pd.read_parquet(quantum_file)
+
+    # Synthesize 3 valid test mutants with contract energies and consistent errors
+    mutants_data = [
+        ("IsPETase_W159H", "W159H", -1024.265000, -1024.264980),
+        ("IsPETase_D186H", "D186H", -1024.270000, -1024.269975),
+        ("IsPETase_S238F", "S238F", -1024.260000, -1024.259970),
+    ]
+
+    mut_rows = []
+    for var_id, mut, casci_e, vqe_e in mutants_data:
+        row = base_df.iloc[0].copy()
+        row["variant_id"] = var_id
+        row["mutation"] = mut
+        row["casci_energy_hartree"] = casci_e
+        row["quantum_casci_reference_energy_hartree"] = casci_e
+        row["vqe_energy_hartree"] = vqe_e
+        row["absolute_vqe_error_hartree"] = abs(vqe_e - casci_e)
+        mut_rows.append(row)
+
+    valid_df = pd.concat([base_df, pd.DataFrame(mut_rows)], ignore_index=True)
+    valid_path = tmp_path / "valid_matching_mutants.parquet"
+    valid_df.to_parquet(valid_path)
+
+    df_results = run_benchmark_suite(
+        variants_path=variants_path,
+        predictions_path=preds_path,
+        uncertainty_path=uncert_path,
+        quantum_results_path=valid_path,
+        n_bootstrap=50,
+        random_seed=42,
+    )
+
+    # Check Arms A5 and A6 are evaluated
+    a5_eval = df_results[(df_results["arm_id"] == "A5") & (df_results["status"] == "evaluated")]
+    a6_eval = df_results[(df_results["arm_id"] == "A6") & (df_results["status"] == "evaluated")]
+
+    assert not a5_eval.empty
+    assert not a6_eval.empty
+
+    # Verify ranking metrics are computed and finite
+    assert "precision@10" in a5_eval["metric_name"].values
+    assert "spearman_rho" in a5_eval["metric_name"].values
+    assert np.all(np.isfinite(a5_eval["metric_value"]))
+    assert np.all(np.isfinite(a6_eval["metric_value"]))
+
+    # A7 must still remain pending
+    a7_rows = df_results[df_results["arm_id"] == "A7"]
+    assert a7_rows.iloc[0]["status"] == "pending_noisy_vqe_data"
+    assert np.isnan(a7_rows.iloc[0]["metric_value"])
+
 
