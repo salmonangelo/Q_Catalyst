@@ -1,0 +1,50 @@
+{
+  "experiment": "WT PETase CAS(4e,4o) UCCSD Circuit Resource Inspection",
+  "simulation_note": "These metrics represent simulated circuit resource estimates from algorithmic transpilation, not physical quantum hardware measurements.",
+  "environment": {
+    "qiskit_version": "2.6.1",
+    "qiskit_nature_version": "0.8.0"
+  },
+  "active_space_specification": {
+    "num_spatial_orbitals": 4,
+    "num_particles": [
+      2,
+      2
+    ],
+    "mapper": "Jordan-Wigner",
+    "ansatz": "UCCSD",
+    "reps": 1,
+    "preserve_spin": true
+  },
+  "circuit_validation": {
+    "num_qubits": 8,
+    "num_parameters": 26,
+    "matches_wt_vqe_experiment": true
+  },
+  "transpilation_settings": {
+    "basis_gates": [
+      "cx",
+      "id",
+      "rz",
+      "sx",
+      "x"
+    ],
+    "optimization_level": 2,
+    "seed_transpiler": 42
+  },
+  "circuit_resources": {
+    "num_qubits": 8,
+    "num_parameters": 26,
+    "original_ansatz_depth": 1,
+    "transpiled_circuit_depth": 667,
+    "two_qubit_gate_count": 265,
+    "cx_gate_count": 265,
+    "total_gate_count": 1171,
+    "operation_counts": {
+      "rz": 479,
+      "sx": 417,
+      "cx": 265,
+      "x": 10
+    }
+  }
+}

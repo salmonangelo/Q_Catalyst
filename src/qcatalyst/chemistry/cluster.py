@@ -6,7 +6,11 @@ Assembles the catalytic triad (Ser160, His237, Asp206), oxyanion hole, and subst
 import os
 from typing import Dict, List, Tuple, Optional
 import numpy as np
-from Bio.PDB import PDBParser
+try:
+    from Bio.PDB import PDBParser
+    _HAS_BIOPYTHON = True
+except ImportError:
+    _HAS_BIOPYTHON = False
 
 
 class ActiveSiteClusterBuilder:
@@ -16,13 +20,31 @@ class ActiveSiteClusterBuilder:
 
     def __init__(self, pdb_path: str = "data/structures/5XJH.pdb"):
         self.pdb_path = pdb_path
-        parser = PDBParser(QUIET=True)
-        self.structure = parser.get_structure("PETase", pdb_path)
-        self.model = self.structure[0]
-        self.chain_a = self.model["A"]
+        self._coords: Dict[Tuple[int, str], np.ndarray] = {}
+        if _HAS_BIOPYTHON:
+            parser = PDBParser(QUIET=True)
+            self.structure = parser.get_structure("PETase", pdb_path)
+            self.model = self.structure[0]
+            self.chain_a = self.model["A"]
+        else:
+            self._load_native_pdb(pdb_path)
+
+    def _load_native_pdb(self, pdb_path: str, chain_id: str = "A") -> None:
+        with open(pdb_path, "r") as f:
+            for line in f:
+                if line[0:6].strip() == "ATOM" and line[21] == chain_id:
+                    atom_name = line[12:16].strip()
+                    res_id = int(line[22:26])
+                    c = np.array([float(line[30:38]), float(line[38:46]), float(line[46:54])], dtype=np.float64)
+                    self._coords[(res_id, atom_name)] = c
 
     def _get_atom_coord(self, res_id: int, atom_name: str) -> np.ndarray:
-        return self.chain_a[res_id][atom_name].get_coord().copy()
+        if _HAS_BIOPYTHON:
+            return self.chain_a[res_id][atom_name].get_coord().copy()
+        key = (res_id, atom_name)
+        if key not in self._coords:
+            raise KeyError(f"Atom {atom_name} for residue {res_id} not found in {self.pdb_path}")
+        return self._coords[key].copy()
 
     def build_tier_s(
         self,

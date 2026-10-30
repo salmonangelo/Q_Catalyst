@@ -2,6 +2,7 @@
 
 from qcatalyst.evaluation.benchmarks import (
     BenchmarkRecord,
+    load_quantum_results,
     run_benchmark_suite,
     save_benchmark_artifacts,
     score_arm_a0_random,
@@ -31,6 +32,7 @@ __all__ = [
     "evaluate_all_ranking_metrics",
     # Benchmarking
     "BenchmarkRecord",
+    "load_quantum_results",
     "score_arm_a0_random",
     "score_arm_a1_esm1v",
     "score_arm_a2_xgboost_structural",
