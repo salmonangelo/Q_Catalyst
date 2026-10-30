@@ -214,20 +214,6 @@ def test_gate0_real_dataset_integrity():
 
     assert result.n_held_out == 65
     assert np.isfinite(result.spearman_rho)
-<<<<<<< HEAD
-    if len(test_df) == 65:
-        # Honest evaluation on genuine held-out multi-mutants correctly triggers fallback
-        assert result.verdict in ("PASS", "FAIL")
-        assert result.recommended_action in (
-            "PROCEED_WITH_UNCERTAINTY_GATING",
-            "FALLBACK_TO_DIVERSITY_SELECTION",
-        )
-    else:
-        assert result.verdict == "PASS"
-        assert result.recommended_action == "PROCEED_WITH_UNCERTAINTY_GATING"
-    assert result.auroc is not None
-    assert result.auroc_status == "valid"
-=======
     assert result.gate_passed is (result.ci_lower > 0.0)
     assert result.verdict == ("PASS" if result.ci_lower > 0.0 else "FAIL")
     assert result.recommended_action == (
@@ -272,4 +258,3 @@ def test_gate0_requires_held_out_split_provenance():
     })
     with pytest.raises(ValueError, match="split_role provenance"):
         evaluate_gate0(df, n_bootstrap=100)
->>>>>>> 316719bff4cf12d478d19c6b7916dc0a5fb46591

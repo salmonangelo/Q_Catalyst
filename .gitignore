@@ -3,27 +3,6 @@ __pycache__/
 *.py[cod]
 *$py.class
 
-<<<<<<< HEAD
-# Caches and environments
-.pytest_cache/
-env/cache/
-.cache/
-*.pt
-*.bin
-*.safetensors
-*.onnx
-
-# Large embeddings and generated array caches
-results/embeddings/
-*.npz
-*.npy
-*.h5
-*.parquet.tmp
-
-# Scratch files
-scratch/
-.system_generated/
-=======
 # C extensions
 *.so
 
@@ -64,4 +43,22 @@ htmlcov/
 
 # Logs
 *.log
->>>>>>> 3456455f8ccc6339b789726cc0adc6cf6da2681e
+
+# Caches and environments
+env/cache/
+.cache/
+*.pt
+*.bin
+*.safetensors
+*.onnx
+
+# Large embeddings and generated array caches
+results/embeddings/
+*.npz
+*.npy
+*.h5
+*.parquet.tmp
+
+# Scratch files
+scratch/
+.system_generated/
