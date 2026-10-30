@@ -1,0 +1,25 @@
+cluster:
+  name: "PETase_reduced_active_site"
+  reference_structure: "5XJH"
+  triad_residues: [160, 206, 237]
+  oxyanion_residues: [87, 161]
+  substrate: "MHET_dimer_model"
+  capping: "ACE_NME"
+methods:
+  tier_s:
+    method: "B3LYP-D3"
+    basis: "def2-SVP"
+    solvent: "CPCM(water)"
+    convergence_energy_hartree: 1.0e-6
+  tier_m:
+    method: "wB97X-D"
+    basis: "def2-TZVP"
+    convergence_energy_hartree: 1.0e-7
+descriptors:
+  - "d_attack_ser160_c_ester"
+  - "d_hbond_his237_ser160"
+  - "d_hbond_asp206_his237"
+  - "esp_active_site_au"
+  - "delta_e_int_kcal_mol"
+  - "homo_lumo_gap_ev"
+  - "ts_stabilization_proxy_kcal_mol"

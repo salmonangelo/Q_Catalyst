@@ -1,0 +1,17 @@
+seed: 42
+project_name: "Q-Catalyst"
+version: "1.0.0"
+reference_structure:
+  pdb_id: "5XJH"
+  description: "IsPETase high-resolution wild-type reference"
+  resolution_angstrom: 1.58
+  catalytic_triad:
+    serine: 160
+    histidine: 237
+    aspartate: 206
+  oxyanion_hole:
+    donor_1: 87  # Tyr87
+    donor_2: 161 # Met161
+  substrate_model: "2-hydroxyethyl methyl terephthalate (HEMT) / MHET ester"
+output_dir: "results"
+data_dir: "data"

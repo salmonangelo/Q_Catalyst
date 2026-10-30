@@ -1,0 +1,19 @@
+model_type: "ensemble_xgboost_ridge"
+n_estimators: 100
+max_depth: 4
+learning_rate: 0.05
+ridge_alpha: 1.0
+ensemble_seeds: [42, 123, 456, 789, 999]
+conformal:
+  confidence_level: 0.90
+  method: "residual_absolute"
+uncertainty:
+  weights:
+    ensemble_variance: 0.35
+    conformal_interval: 0.25
+    ood_distance: 0.20
+    structural_risk: 0.20
+gate_0:
+  significance_alpha: 0.05
+  bootstrap_iterations: 1000
+  h1_metric: "spearman_rho_error"
