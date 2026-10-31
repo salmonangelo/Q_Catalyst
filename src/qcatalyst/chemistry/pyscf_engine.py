@@ -133,11 +133,16 @@ class PySCFChemistryEngine:
         spin: int = 0,
         mm_coords: Optional[np.ndarray] = None,
         mm_charges: Optional[np.ndarray] = None,
+        metadata: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """
         Runs exact classical Complete Active Space Configuration Interaction (CASCI)
         with explicit convergence validation and active-space Hamiltonian integral extraction.
         """
+        if metadata is not None:
+            from qcatalyst.chemistry.embedding import validate_embedding_for_quantum_execution
+            validate_embedding_for_quantum_execution(metadata)
+
         mol = self._build_mol(geometry_str, charge, spin)
         mf = scf.RHF(mol)
         mf.with_solvent = None  # Prevents __getattr__ dynamic import of DFT on Windows
@@ -285,6 +290,8 @@ class PySCFChemistryEngine:
             },
         }
         if metadata:
+            from qcatalyst.chemistry.embedding import validate_embedding_for_quantum_execution
+            validate_embedding_for_quantum_execution(metadata)
             hamiltonian_dict["variant_metadata"] = metadata
 
         with open(json_path, "w") as f:

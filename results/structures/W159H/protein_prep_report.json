@@ -1,0 +1,300 @@
+{
+  "status": "COMPLETED",
+  "wt_reference": {
+    "pdb_path": "results\\structures\\5XJH_prepared_WT.pdb",
+    "metadata": {
+      "scaffold": "data\\structures\\5XJH.pdb",
+      "mutation": "WT",
+      "is_mutant": false,
+      "mutant_residue_159_tautomer": "N/A (WT Trp)",
+      "total_atoms_prepared": 4101,
+      "protein_atoms_count": 3959,
+      "crystal_waters_count": 142,
+      "total_heavy_atoms": 2073,
+      "total_hydrogens_added": 2054,
+      "disulfide_bonds_detected": 2,
+      "total_system_charge_e": 26.3347,
+      "theoretical_formal_charge_e": 6,
+      "residue_charges_summary": [
+        {
+          "res_seq": 30,
+          "res_name": "GLY",
+          "atom_count": 9,
+          "heavy_count": 4,
+          "hydrogen_count": 5,
+          "net_charge_e": -0.2719
+        },
+        {
+          "res_seq": 31,
+          "res_name": "SER",
+          "atom_count": 11,
+          "heavy_count": 6,
+          "hydrogen_count": 5,
+          "net_charge_e": 0.0539
+        },
+        {
+          "res_seq": 32,
+          "res_name": "HID",
+          "atom_count": 17,
+          "heavy_count": 10,
+          "hydrogen_count": 7,
+          "net_charge_e": 0.175
+        },
+        {
+          "res_seq": 33,
+          "res_name": "MET",
+          "atom_count": 17,
+          "heavy_count": 8,
+          "hydrogen_count": 9,
+          "net_charge_e": -0.007
+        },
+        {
+          "res_seq": 34,
+          "res_name": "ARG",
+          "atom_count": 22,
+          "heavy_count": 9,
+          "hydrogen_count": 13,
+          "net_charge_e": 2.7383
+        },
+        {
+          "res_seq": 35,
+          "res_name": "GLY",
+          "atom_count": 7,
+          "heavy_count": 4,
+          "hydrogen_count": 3,
+          "net_charge_e": 0.0
+        },
+        {
+          "res_seq": 36,
+          "res_name": "PRO",
+          "atom_count": 14,
+          "heavy_count": 7,
+          "hydrogen_count": 7,
+          "net_charge_e": -0.0047
+        },
+        {
+          "res_seq": 37,
+          "res_name": "ASN",
+          "atom_count": 14,
+          "heavy_count": 8,
+          "hydrogen_count": 6,
+          "net_charge_e": -0.0176
+        },
+        {
+          "res_seq": 38,
+          "res_name": "PRO",
+          "atom_count": 14,
+          "heavy_count": 7,
+          "hydrogen_count": 7,
+          "net_charge_e": -0.0047
+        },
+        {
+          "res_seq": 39,
+          "res_name": "THR",
+          "atom_count": 10,
+          "heavy_count": 7,
+          "hydrogen_count": 3,
+          "net_charge_e": -0.1909
+        }
+      ]
+    }
+  },
+  "w159h_hid": {
+    "pdb_path": "results\\structures\\W159H\\W159H_prepared_HID.pdb",
+    "metadata": {
+      "scaffold": "data\\structures\\5XJH.pdb",
+      "mutation": "W159H",
+      "is_mutant": true,
+      "mutant_residue_159_tautomer": "HID",
+      "total_atoms_prepared": 4094,
+      "protein_atoms_count": 3952,
+      "crystal_waters_count": 142,
+      "total_heavy_atoms": 2073,
+      "total_hydrogens_added": 2051,
+      "disulfide_bonds_detected": 2,
+      "total_system_charge_e": 26.5784,
+      "theoretical_formal_charge_e": 6,
+      "residue_charges_summary": [
+        {
+          "res_seq": 30,
+          "res_name": "GLY",
+          "atom_count": 9,
+          "heavy_count": 4,
+          "hydrogen_count": 5,
+          "net_charge_e": -0.2719
+        },
+        {
+          "res_seq": 31,
+          "res_name": "SER",
+          "atom_count": 11,
+          "heavy_count": 6,
+          "hydrogen_count": 5,
+          "net_charge_e": 0.0539
+        },
+        {
+          "res_seq": 32,
+          "res_name": "HID",
+          "atom_count": 17,
+          "heavy_count": 10,
+          "hydrogen_count": 7,
+          "net_charge_e": 0.175
+        },
+        {
+          "res_seq": 33,
+          "res_name": "MET",
+          "atom_count": 17,
+          "heavy_count": 8,
+          "hydrogen_count": 9,
+          "net_charge_e": -0.007
+        },
+        {
+          "res_seq": 34,
+          "res_name": "ARG",
+          "atom_count": 22,
+          "heavy_count": 9,
+          "hydrogen_count": 13,
+          "net_charge_e": 2.7383
+        },
+        {
+          "res_seq": 35,
+          "res_name": "GLY",
+          "atom_count": 7,
+          "heavy_count": 4,
+          "hydrogen_count": 3,
+          "net_charge_e": 0.0
+        },
+        {
+          "res_seq": 36,
+          "res_name": "PRO",
+          "atom_count": 14,
+          "heavy_count": 7,
+          "hydrogen_count": 7,
+          "net_charge_e": -0.0047
+        },
+        {
+          "res_seq": 37,
+          "res_name": "ASN",
+          "atom_count": 14,
+          "heavy_count": 8,
+          "hydrogen_count": 6,
+          "net_charge_e": -0.0176
+        },
+        {
+          "res_seq": 38,
+          "res_name": "PRO",
+          "atom_count": 14,
+          "heavy_count": 7,
+          "hydrogen_count": 7,
+          "net_charge_e": -0.0047
+        },
+        {
+          "res_seq": 39,
+          "res_name": "THR",
+          "atom_count": 10,
+          "heavy_count": 7,
+          "hydrogen_count": 3,
+          "net_charge_e": -0.1909
+        }
+      ]
+    }
+  },
+  "w159h_hie": {
+    "pdb_path": "results\\structures\\W159H\\W159H_prepared_HIE.pdb",
+    "metadata": {
+      "scaffold": "data\\structures\\5XJH.pdb",
+      "mutation": "W159H",
+      "is_mutant": true,
+      "mutant_residue_159_tautomer": "HIE",
+      "total_atoms_prepared": 4094,
+      "protein_atoms_count": 3952,
+      "crystal_waters_count": 142,
+      "total_heavy_atoms": 2073,
+      "total_hydrogens_added": 2051,
+      "disulfide_bonds_detected": 2,
+      "total_system_charge_e": 26.5392,
+      "theoretical_formal_charge_e": 6,
+      "residue_charges_summary": [
+        {
+          "res_seq": 30,
+          "res_name": "GLY",
+          "atom_count": 9,
+          "heavy_count": 4,
+          "hydrogen_count": 5,
+          "net_charge_e": -0.2719
+        },
+        {
+          "res_seq": 31,
+          "res_name": "SER",
+          "atom_count": 11,
+          "heavy_count": 6,
+          "hydrogen_count": 5,
+          "net_charge_e": 0.0539
+        },
+        {
+          "res_seq": 32,
+          "res_name": "HID",
+          "atom_count": 17,
+          "heavy_count": 10,
+          "hydrogen_count": 7,
+          "net_charge_e": 0.175
+        },
+        {
+          "res_seq": 33,
+          "res_name": "MET",
+          "atom_count": 17,
+          "heavy_count": 8,
+          "hydrogen_count": 9,
+          "net_charge_e": -0.007
+        },
+        {
+          "res_seq": 34,
+          "res_name": "ARG",
+          "atom_count": 22,
+          "heavy_count": 9,
+          "hydrogen_count": 13,
+          "net_charge_e": 2.7383
+        },
+        {
+          "res_seq": 35,
+          "res_name": "GLY",
+          "atom_count": 7,
+          "heavy_count": 4,
+          "hydrogen_count": 3,
+          "net_charge_e": 0.0
+        },
+        {
+          "res_seq": 36,
+          "res_name": "PRO",
+          "atom_count": 14,
+          "heavy_count": 7,
+          "hydrogen_count": 7,
+          "net_charge_e": -0.0047
+        },
+        {
+          "res_seq": 37,
+          "res_name": "ASN",
+          "atom_count": 14,
+          "heavy_count": 8,
+          "hydrogen_count": 6,
+          "net_charge_e": -0.0176
+        },
+        {
+          "res_seq": 38,
+          "res_name": "PRO",
+          "atom_count": 14,
+          "heavy_count": 7,
+          "hydrogen_count": 7,
+          "net_charge_e": -0.0047
+        },
+        {
+          "res_seq": 39,
+          "res_name": "THR",
+          "atom_count": 10,
+          "heavy_count": 7,
+          "hydrogen_count": 3,
+          "net_charge_e": -0.1909
+        }
+      ]
+    }
+  }
+}
