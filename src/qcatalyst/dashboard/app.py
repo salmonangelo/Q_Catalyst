@@ -20,6 +20,7 @@ import streamlit.components.v1 as components
 # Ensure project root is in sys.path
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
+sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
 from src.qcatalyst.data.loader import ISPETASE_WT_SEQUENCE, CATALYTIC_TRIAD, OXYANION_HOLE
 from src.qcatalyst.structure.pdb_parser import RESIDUE_COORDINATES_5XJH, SUBSTRATE_POSE
