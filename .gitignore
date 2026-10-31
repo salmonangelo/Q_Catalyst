@@ -55,6 +55,7 @@ env/cache/
 # Large embeddings and generated array caches
 results/embeddings/
 *.npz
+!results/quantum/*.npz
 *.npy
 *.h5
 *.parquet.tmp

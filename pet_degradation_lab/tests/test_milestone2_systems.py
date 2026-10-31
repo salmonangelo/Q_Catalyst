@@ -15,7 +15,7 @@ import sys
 from pathlib import Path
 import pytest
 import numpy as np
-import openmm
+openmm = pytest.importorskip("openmm")
 import openmm.app as app
 from openmm import unit
 

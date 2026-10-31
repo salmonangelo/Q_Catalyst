@@ -5,9 +5,14 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 SRC_DIR = REPO_ROOT / "src"
+LAB_DIR = REPO_ROOT / "pet_degradation_lab"
 
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
 if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
+if str(LAB_DIR) not in sys.path:
+    sys.path.insert(0, str(LAB_DIR))
 
 # Ensure optional external dependencies not needed for evaluation do not block test collection
 if "Bio" not in sys.modules:

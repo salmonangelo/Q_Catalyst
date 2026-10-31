@@ -3,7 +3,7 @@ AMBER ff14SB Partial Atomic Charge Parameters for Protein Residues and Water.
 Standard partial charges derived from AMBER ff14SB force field libraries.
 """
 
-from typing import Dict, Optional
+from typing import Dict, Optional, Any
 
 # Standard AMBER ff14SB partial atomic charges (in elementary charges e)
 # for standard amino acid residues and TIP3P water

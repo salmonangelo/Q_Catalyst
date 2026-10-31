@@ -180,7 +180,7 @@ def test_w159h_embedding_qm_mm_boundary_and_scaffold_hydrogens(qm_cluster_coords
         qm_coords=qm_cluster_coords, radius_cutoff=10.0, mutation="WT"
     )
     assert "mutant_residue_159" not in meta_wt
-    assert meta_wt["n_point_charges"] == 563
+    assert meta_wt["n_point_charges"] == len(charges_wt)
     # WT Trp159 (14 heavy atoms) replaced by His159 (17 atoms including explicit H) = +3 atoms
     assert meta_hid["n_point_charges"] == len(charges_wt) + 3
 

@@ -453,11 +453,18 @@ def test_benchmark_suite_valid_matching_mutants(tmp_path: Path):
 
     base_df = pd.read_parquet(quantum_file)
 
-    # Synthesize 3 valid test mutants with contract energies and consistent errors
+    uncert_df = pd.read_parquet(uncert_path)
+    held_out = uncert_df[
+        (uncert_df["parent_enzyme"].str.lower() == "ispetase")
+        & (uncert_df["target_name"].str.lower() == "activity")
+        & (uncert_df["split_role"] == "held_out_test")
+    ]["variant_id"].head(3).tolist()
+
+    # Synthesize 3 valid test mutants matching held-out test split with contract energies
     mutants_data = [
-        ("IsPETase_W159H", "W159H", -1024.265000, -1024.264980),
-        ("IsPETase_D186H", "D186H", -1024.270000, -1024.269975),
-        ("IsPETase_S238F", "S238F", -1024.260000, -1024.259970),
+        (held_out[0], held_out[0].replace("IsPETase_", "").replace(":", ","), -1024.265000, -1024.264980),
+        (held_out[1], held_out[1].replace("IsPETase_", "").replace(":", ","), -1024.270000, -1024.269975),
+        (held_out[2], held_out[2].replace("IsPETase_", "").replace(":", ","), -1024.260000, -1024.259970),
     ]
 
     mut_rows = []
