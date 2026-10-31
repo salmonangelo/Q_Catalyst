@@ -1,0 +1,67 @@
+REMARK    BHET Substrate Model for PETase Binding Cleft
+REMARK    GAFF2/RESP compliant nomenclature
+HETATM    1  C1  BHT B 900      -1.278  24.073 -29.537  1.00 20.00           C
+HETATM    2  C2  BHT B 900       0.117  24.076 -29.655  1.00 20.00           C
+HETATM    3  C3  BHT B 900       0.891  23.160 -28.928  1.00 20.00           C
+HETATM    4  C4  BHT B 900       0.254  22.245 -28.079  1.00 20.00           C
+HETATM    5  C5  BHT B 900      -1.139  22.242 -27.961  1.00 20.00           C
+HETATM    6  C6  BHT B 900      -1.914  23.155 -28.690  1.00 20.00           C
+HETATM    7  C7  BHT B 900      -3.393  23.109 -28.526  1.00 20.00           C
+HETATM    8  O1  BHT B 900      -3.965  22.327 -27.784  1.00 20.00           O
+HETATM    9  O2  BHT B 900      -3.992  24.039 -29.310  1.00 20.00           O
+HETATM   10  C8  BHT B 900      -5.420  24.067 -29.196  1.00 20.00           C
+HETATM   11  C9  BHT B 900      -5.974  25.095 -30.175  1.00 20.00           C
+HETATM   12  O3  BHT B 900      -7.393  25.158 -30.111  1.00 20.00           O
+HETATM   13 C10  BHT B 900       2.377  23.123 -29.016  1.00 20.00           C
+HETATM   14  O4  BHT B 900       3.077  22.379 -28.347  1.00 20.00           O
+HETATM   15  O5  BHT B 900       2.821  24.014 -29.933  1.00 20.00           O
+HETATM   16 C11  BHT B 900       4.250  24.059 -30.072  1.00 20.00           C
+HETATM   17 C12  BHT B 900       4.609  25.124 -31.105  1.00 20.00           C
+HETATM   18  O6  BHT B 900       4.254  26.430 -30.652  1.00 20.00           O
+HETATM   19  H2  BHT B 900      -1.852  24.796 -30.112  1.00 20.00           H
+HETATM   20  H3  BHT B 900       0.586  24.802 -30.317  1.00 20.00           H
+HETATM   21  H5  BHT B 900       0.840  21.529 -27.504  1.00 20.00           H
+HETATM   22  H6  BHT B 900      -1.617  21.524 -27.296  1.00 20.00           H
+HETATM   23 H8A  BHT B 900      -5.839  23.080 -29.424  1.00 20.00           H
+HETATM   24 H8B  BHT B 900      -5.710  24.336 -28.173  1.00 20.00           H
+HETATM   25 H9A  BHT B 900      -5.573  26.089 -29.948  1.00 20.00           H
+HETATM   26 H9B  BHT B 900      -5.673  24.859 -31.201  1.00 20.00           H
+HETATM   27 HO3  BHT B 900      -7.740  24.295 -30.396  1.00 20.00           H
+HETATM   28 H11A BHT B 900       4.695  24.312 -29.103  1.00 20.00           H
+HETATM   29 H11B BHT B 900       4.612  23.082 -30.410  1.00 20.00           H
+HETATM   30 H12A BHT B 900       5.684  25.116 -31.308  1.00 20.00           H
+HETATM   31 H12B BHT B 900       4.071  24.949 -32.041  1.00 20.00           H
+HETATM   32 HO6  BHT B 900       4.654  26.561 -29.775  1.00 20.00           H
+CONECT    1    2
+CONECT    2    3
+CONECT    3    4
+CONECT    4    5
+CONECT    5    6
+CONECT    6    7
+CONECT    7    8
+CONECT    7    9
+CONECT    9   10
+CONECT   10   11
+CONECT   11   12
+CONECT    3   13
+CONECT   13   14
+CONECT   13   15
+CONECT   15   16
+CONECT   16   17
+CONECT   17   18
+CONECT    6    1
+CONECT    1   19
+CONECT    2   20
+CONECT    4   21
+CONECT    5   22
+CONECT   10   23
+CONECT   10   24
+CONECT   11   25
+CONECT   11   26
+CONECT   12   27
+CONECT   16   28
+CONECT   16   29
+CONECT   17   30
+CONECT   17   31
+CONECT   18   32
+END

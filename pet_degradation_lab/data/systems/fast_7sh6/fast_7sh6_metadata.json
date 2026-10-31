@@ -1,0 +1,22 @@
+{
+  "system_id": "fast_7sh6",
+  "is_holo": true,
+  "num_solute_atoms": 4884,
+  "num_waters": 11764,
+  "num_na_ions": 31,
+  "num_cl_ions": 37,
+  "total_particles": 39158,
+  "net_charge": -0.0,
+  "ionic_strength_M": 0.15,
+  "box_dimensions_nm": [
+    7.438081885934662,
+    7.438081885934662,
+    7.438081885934662
+  ],
+  "potential_energy_kj_mol": -491208.57,
+  "is_stable": true,
+  "pdb_path": "/home/luckycelestial/Pavithran/QCatalyst/Q_Catalyst/pet_degradation_lab/data/systems/fast_7sh6/fast_7sh6_solvated.pdb",
+  "system_xml_path": "/home/luckycelestial/Pavithran/QCatalyst/Q_Catalyst/pet_degradation_lab/data/systems/fast_7sh6/fast_7sh6_system.xml",
+  "integrator_xml_path": "/home/luckycelestial/Pavithran/QCatalyst/Q_Catalyst/pet_degradation_lab/data/systems/fast_7sh6/fast_7sh6_integrator.xml",
+  "summary": "System fast_7sh6 built (Holo): 39158 particles (4884 solute, 11764 waters, 31 Na+, 37 Cl-), Box: 7.44x7.44x7.44 nm, Net Charge: -0.00 e, Potential Energy: -491208.6 kJ/mol"
+}

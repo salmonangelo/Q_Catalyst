@@ -1,0 +1,770 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Q-Catalyst PET Degradation Lab — Standalone Research Explorer</title>
+  
+  <!-- Modern Clean Typography -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  
+  <!-- PDBe Mol* Viewer CSS and JS -->
+  <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/pdbe-molstar@3.1.2/build/pdbe-molstar.css">
+  <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/pdbe-molstar@3.1.2/build/pdbe-molstar-component.js"></script>
+
+  <style>
+    :root {
+      --bg: #0b0f17;
+      --card-bg: #111827;
+      --card-border: #1f2937;
+      --text: #f3f4f6;
+      --text-muted: #9ca3af;
+      --accent: #0284c7;
+      --accent-hover: #0369a1;
+      --cyan: #06b6d4;
+      --emerald: #10b981;
+      --amber: #f59e0b;
+      --rose: #f43f5e;
+      --sidebar-width: 260px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Inter', -apple-system, sans-serif;
+      background-color: var(--bg);
+      color: var(--text);
+      display: flex;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    /* Sidebar Navigation */
+    aside {
+      width: var(--sidebar-width);
+      background-color: #0d131f;
+      border-right: 1px solid var(--card-border);
+      display: flex;
+      flex-direction: column;
+      padding: 20px 16px;
+      flex-shrink: 0;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 28px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid var(--card-border);
+    }
+    .brand-icon {
+      font-size: 24px;
+      background: linear-gradient(135deg, var(--cyan), var(--accent));
+      width: 42px;
+      height: 42px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .brand-text h1 { font-size: 15px; font-weight: 700; color: #fff; letter-spacing: -0.3px; }
+    .brand-text p { font-size: 11px; color: var(--text-muted); }
+
+    .nav-list { list-style: none; display: flex; flex-direction: column; gap: 6px; }
+    .nav-btn {
+      width: 100%;
+      text-align: left;
+      padding: 10px 14px;
+      background: transparent;
+      border: 1px solid transparent;
+      border-radius: 8px;
+      color: var(--text-muted);
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      transition: all 0.15s ease;
+    }
+    .nav-btn:hover { background-color: #1e293b; color: #fff; }
+    .nav-btn.active {
+      background-color: #0369a1;
+      color: #fff;
+      border-color: #38bdf8;
+      box-shadow: 0 4px 12px rgba(2, 132, 199, 0.25);
+    }
+
+    .sidebar-footer {
+      margin-top: auto;
+      padding-top: 16px;
+      border-top: 1px solid var(--card-border);
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+    .badge-isolated {
+      background: rgba(16, 185, 129, 0.15);
+      color: var(--emerald);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      padding: 3px 6px;
+      border-radius: 4px;
+      font-size: 10px;
+      font-weight: 600;
+      display: inline-block;
+      margin-top: 6px;
+    }
+
+    /* Main Content Area */
+    main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+      background-color: var(--bg);
+    }
+
+    header {
+      padding: 18px 32px;
+      background-color: rgba(17, 24, 39, 0.8);
+      backdrop-filter: blur(8px);
+      border-bottom: 1px solid var(--card-border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .header-title h2 { font-size: 18px; font-weight: 600; }
+    .header-title p { font-size: 12px; color: var(--text-muted); }
+    .snapshot-picker {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+    }
+    select {
+      background-color: #1f2937;
+      border: 1px solid #374151;
+      color: #fff;
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 12px;
+    }
+
+    .content-container {
+      padding: 28px 32px;
+      flex: 1;
+    }
+
+    .view-panel { display: none; }
+    .view-panel.active { display: block; }
+
+    /* Cards and Grids */
+    .card {
+      background-color: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+    .card h3 { font-size: 14px; font-weight: 600; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+
+    .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 20px; }
+    .stat-card {
+      background-color: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 10px;
+      padding: 16px;
+    }
+    .stat-card .val { font-size: 22px; font-weight: 700; color: #fff; margin-top: 4px; font-family: 'JetBrains Mono', monospace; }
+    .stat-card .lbl { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
+
+    /* Tables */
+    table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    th { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--card-border); color: var(--text-muted); font-weight: 600; }
+    td { padding: 10px 12px; border-bottom: 1px solid #1a2234; }
+    tr:hover td { background-color: #131c2d; }
+    .tag {
+      display: inline-block;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 10px;
+      font-weight: 600;
+      font-family: 'JetBrains Mono', monospace;
+    }
+    .tag-green { background: rgba(16, 185, 129, 0.2); color: #34d399; }
+    .tag-yellow { background: rgba(245, 158, 11, 0.2); color: #fbbf24; }
+    .tag-red { background: rgba(244, 63, 94, 0.2); color: #fb7185; }
+    .tag-blue { background: rgba(2, 132, 199, 0.2); color: #38bdf8; }
+
+    /* Sequence box */
+    .seq-box {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      background: #080c14;
+      padding: 12px;
+      border-radius: 6px;
+      border: 1px solid var(--card-border);
+      max-height: 120px;
+      overflow-y: auto;
+      word-break: break-all;
+      line-height: 1.6;
+      color: #93c5fd;
+    }
+
+    /* Mol* Container */
+    #molstar-container {
+      width: 100%;
+      height: 520px;
+      background-color: #080c14;
+      border-radius: 8px;
+      border: 1px solid var(--card-border);
+      position: relative;
+    }
+
+    /* Placeholder Banner */
+    .not-yet-banner {
+      background: rgba(245, 158, 11, 0.1);
+      border: 1px solid rgba(245, 158, 11, 0.3);
+      border-radius: 8px;
+      padding: 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      color: #fcd34d;
+      margin-bottom: 20px;
+      font-size: 12px;
+    }
+    .not-yet-tag {
+      background: #f59e0b;
+      color: #000;
+      padding: 3px 8px;
+      border-radius: 4px;
+      font-weight: 700;
+      font-size: 10px;
+      letter-spacing: 0.5px;
+    }
+
+    /* Checklist */
+    .checklist-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 16px;
+      border-bottom: 1px solid #1a2234;
+      font-size: 13px;
+    }
+    .checklist-item:last-child { border-bottom: none; }
+    .checklist-status { font-weight: 600; font-size: 11px; }
+
+    /* Button */
+    .btn {
+      background: var(--accent);
+      border: none;
+      color: #fff;
+      padding: 6px 14px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+    }
+    .btn:hover { background: var(--accent-hover); }
+  </style>
+</head>
+<body>
+
+  <!-- Left Sidebar -->
+  <aside>
+    <div class="brand">
+      <div class="brand-icon">🧬</div>
+      <div class="brand-text">
+        <h1>PET Degradation Lab</h1>
+        <p>Independent Research Module</p>
+      </div>
+    </div>
+
+    <ul class="nav-list">
+      <li><button class="nav-btn active" onclick="showView('inventory')">📋 View 1: Inventory</button></li>
+      <li><button class="nav-btn" onclick="showView('evidence')">🔬 View 2: Candidate Evidence</button></li>
+      <li><button class="nav-btn" onclick="showView('explorer')">🌐 View 3: 3D Structure Explorer</button></li>
+      <li><button class="nav-btn" onclick="showView('readiness')">⚙️ View 4: Simulation Readiness</button></li>
+      <li><button class="nav-btn" onclick="showView('comparison')">📊 View 5: Future Comparisons</button></li>
+    </ul>
+
+    <div class="sidebar-footer">
+      <div>Module Isolation: <span class="badge-isolated">100% ISOLATED</span></div>
+      <div style="margin-top: 4px; font-size: 10px; color: #64748b;">Read-Only Q-Catalyst Snapshots</div>
+      <div style="margin-top: 2px; font-size: 10px; color: #64748b;">Python 3.12 Independent Toolchain</div>
+    </div>
+  </aside>
+
+  <!-- Main View Area -->
+  <main>
+    <header>
+      <div class="header-title">
+        <h2 id="view-title">Candidate Variant Inventory</h2>
+        <p id="view-subtitle">Inspected scientific outputs from verified Q-Catalyst read-only snapshots</p>
+      </div>
+      <div class="snapshot-picker">
+        <label for="snapshot-select">Snapshot:</label>
+        <select id="snapshot-select" onchange="loadSnapshot(this.value)">
+          <option value="">Loading snapshots...</option>
+        </select>
+      </div>
+    </header>
+
+    <div class="content-container">
+
+      <!-- VIEW 1: CANDIDATE INVENTORY -->
+      <section id="view-inventory" class="view-panel active">
+        <div class="grid-4">
+          <div class="stat-card">
+            <div class="lbl">Candidates Ingested</div>
+            <div class="val" id="stat-cand-count">0</div>
+          </div>
+          <div class="stat-card">
+            <div class="lbl">Structures Available</div>
+            <div class="val" id="stat-struct-count">0</div>
+          </div>
+          <div class="stat-card">
+            <div class="lbl">DFT Descriptors Loaded</div>
+            <div class="val" id="stat-dft-count">0</div>
+          </div>
+          <div class="stat-card">
+            <div class="lbl">Active-Space VQE Parity</div>
+            <div class="val" id="stat-quantum-count">0</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3>Prioritized Candidate Cohort</h3>
+          <table>
+            <thead>
+              <tr>
+                <th>Variant ID</th>
+                <th>Mutations</th>
+                <th>Prior Art</th>
+                <th>Predicted Activity</th>
+                <th>Confidence Tier</th>
+                <th>Sequence</th>
+                <th>3D Structure</th>
+                <th>DFT Evidence</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="inventory-table-body">
+              <tr><td colspan="9" style="text-align: center; color: var(--text-muted);">Loading candidates from snapshot...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- VIEW 2: CANDIDATE EVIDENCE -->
+      <section id="view-evidence" class="view-panel">
+        <div class="card">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+            <h3>Variant Evidence Card: <span id="evidence-variant-id" style="color: var(--cyan);">VAR-ENG-004</span></h3>
+            <select id="evidence-variant-select" onchange="renderEvidenceCard(this.value)">
+              <option value="">Select Variant...</option>
+            </select>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+            <div>
+              <div style="margin-bottom: 12px;">
+                <span class="lbl">Canonical Mutations:</span>
+                <span id="ev-mutations" class="tag tag-blue" style="font-size: 12px; margin-left: 6px;">S121E:D186H:...</span>
+              </div>
+              <div style="margin-bottom: 12px;">
+                <span class="lbl">AI Model & Predicted Activity:</span>
+                <span id="ev-pred-act" style="font-weight: 600; margin-left: 6px;">XGBoost (Rel: +1.45x)</span>
+              </div>
+              <div style="margin-bottom: 12px;">
+                <span class="lbl">Uncertainty & Gate 0 Status:</span>
+                <span id="ev-unc-status" class="tag tag-yellow" style="margin-left: 6px;">FAIL (Diversity Fallback)</span>
+              </div>
+              <div style="margin-bottom: 12px;">
+                <span class="lbl">Confidence Tier & Reason:</span>
+                <p id="ev-reason" style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">High Confidence prior art variant.</p>
+              </div>
+            </div>
+
+            <div>
+              <div style="margin-bottom: 12px;">
+                <span class="lbl">Computational Chemistry (PySCF DFT/RHF):</span>
+                <span id="ev-dft-status" class="tag tag-green" style="margin-left: 6px;">Available</span>
+                <div id="ev-dft-details" style="font-size: 11px; color: var(--text-muted); margin-top: 4px;"></div>
+              </div>
+              <div style="margin-bottom: 12px;">
+                <span class="lbl">Quantum Active-Space (CASCI / VQE):</span>
+                <span id="ev-quant-status" class="tag tag-blue" style="margin-left: 6px;">Simulated</span>
+                <div id="ev-quant-details" style="font-size: 11px; color: var(--text-muted); margin-top: 4px;"></div>
+              </div>
+              <div style="margin-bottom: 12px;">
+                <span class="lbl">Provenance Tracking:</span>
+                <div id="ev-provenance" style="font-size: 11px; color: var(--text-muted); margin-top: 4px; font-family: monospace;"></div>
+              </div>
+            </div>
+          </div>
+
+          <div style="margin-top: 20px;">
+            <div class="lbl" style="margin-bottom: 6px;">Full Validated Amino Acid Sequence (290 AA):</div>
+            <div id="ev-sequence" class="seq-box">Loading sequence...</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- VIEW 3: 3D STRUCTURE EXPLORER -->
+      <section id="view-explorer" class="view-panel">
+        <div class="card">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+            <h3>Interactive 3D Structure Explorer (PDBe Mol*)</h3>
+            <div style="display: flex; gap: 10px; align-items: center;">
+              <select id="explorer-pdb-select" onchange="loadPdbIntoMolstar(this.value)">
+                <option value="5XJH.pdb">Reference: 5XJH.pdb (WT IsPETase)</option>
+                <option value="7SH6.pdb">Reference: 7SH6.pdb (FAST-PETase)</option>
+              </select>
+              <button class="btn" onclick="resetMolstarView()">Reset Camera</button>
+            </div>
+          </div>
+          
+          <div id="molstar-container">
+            <pdbe-molstar id="pdbe-viewer" hide-controls="false" subscribe-events="true"></pdbe-molstar>
+          </div>
+          <div style="font-size: 11px; color: var(--text-muted); margin-top: 8px;">
+            Catalytic landmarks: Ser160 (Nucleophile), His237 (General Base), Asp206 (Acid), Met161 (Oxyanion donor). Structures served read-only from local snapshot.
+          </div>
+        </div>
+      </section>
+
+      <!-- VIEW 4: SIMULATION READINESS -->
+      <section id="view-readiness" class="view-panel">
+        <div class="card">
+          <h3>Molecular Dynamics & QM/MM Simulation Readiness Checklist</h3>
+          <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 16px;">
+            Milestone 1 audits requirements and enforces that no expensive simulations are launched before validated force-field parameters exist.
+          </p>
+
+          <div class="checklist-item">
+            <div>
+              <strong>1. Structure Preparation & Crystallographic Waters</strong>
+              <div style="font-size: 11px; color: var(--text-muted);">26 candidate structures verified with crystal water retention (>50 waters per structure).</div>
+            </div>
+            <span class="tag tag-green checklist-status">READY (Pass)</span>
+          </div>
+
+          <div class="checklist-item">
+            <div>
+              <strong>2. PET Substrate Model (Oligomer Topology)</strong>
+              <div style="font-size: 11px; color: var(--text-muted);">Mono-PET and 2-PET ester chains must be constructed with GAFF2/RESP parameterization.</div>
+            </div>
+            <span class="tag tag-yellow checklist-status">PENDING MILESTONE 2</span>
+          </div>
+
+          <div class="checklist-item">
+            <div>
+              <strong>3. Force-Field Parameterization (AMBER ff14SB + Polymer)</strong>
+              <div style="font-size: 11px; color: var(--text-muted);">Standard protein force field ready; PET polymer ester torsion dihedral parameters pending.</div>
+            </div>
+            <span class="tag tag-yellow checklist-status">PENDING MILESTONE 2</span>
+          </div>
+
+          <div class="checklist-item">
+            <div>
+              <strong>4. Solvated Neutralized System Box</strong>
+              <div style="font-size: 11px; color: var(--text-muted);">TIP3P explicit water box + 150 mM NaCl counterions setup pipeline.</div>
+            </div>
+            <span class="tag tag-yellow checklist-status">PENDING MILESTONE 2</span>
+          </div>
+
+          <div class="checklist-item">
+            <div>
+              <strong>5. Molecular Dynamics Simulation Engine (OpenMM / GROMACS)</strong>
+              <div style="font-size: 11px; color: var(--text-muted);">Execution environment target Python 3.12 prepared in pet_degradation_lab/.venv.</div>
+            </div>
+            <span class="tag tag-green checklist-status">ENVIRONMENT READY</span>
+          </div>
+
+          <div class="checklist-item">
+            <div>
+              <strong>6. Trajectory Analysis Pipelines (MDAnalysis, RMSD, RMSF)</strong>
+              <div style="font-size: 11px; color: var(--text-muted);">Analysis scripts and contact distance algorithms defined in pet_degradation_lab/analysis/.</div>
+            </div>
+            <span class="tag tag-blue checklist-status">SPECIFIED (Awaiting Trajectories)</span>
+          </div>
+
+          <div class="checklist-item">
+            <div>
+              <strong>7. Hybrid QM/MM Reaction Pathway (CP2K / PySCF)</strong>
+              <div style="font-size: 11px; color: var(--text-muted);">Catalytic triad cluster Tier S validated; transition-state NEB scans pending Milestone 3.</div>
+            </div>
+            <span class="tag tag-yellow checklist-status">PENDING MILESTONE 3</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- VIEW 5: FUTURE COMPARISONS DASHBOARD -->
+      <section id="view-comparison" class="view-panel">
+        <div class="not-yet-banner">
+          <span class="not-yet-tag">HONEST SCIENTIFIC BOUNDARY</span>
+          <span>The benchmarks below require production molecular dynamics trajectories and prospective wet-lab kinetics. In Milestone 1, all entries are strictly marked <strong>NOT YET CALCULATED</strong>. Zero fake charts or fabricated values are displayed.</span>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+          <div class="card">
+            <h3>Backbone Flexibility: RMSD vs Production Time</h3>
+            <div style="height: 180px; display: flex; align-items: center; justify-content: center; background: #080c14; border-radius: 8px; border: 1px dashed var(--card-border);">
+              <span class="tag tag-yellow">NOT YET CALCULATED (Pending Milestone 2 MD)</span>
+            </div>
+          </div>
+
+          <div class="card">
+            <h3>Active-Site Loop Flexibility: RMSF Profile</h3>
+            <div style="height: 180px; display: flex; align-items: center; justify-content: center; background: #080c14; border-radius: 8px; border: 1px dashed var(--card-border);">
+              <span class="tag tag-yellow">NOT YET CALCULATED (Pending Milestone 2 MD)</span>
+            </div>
+          </div>
+
+          <div class="card">
+            <h3>PET Substrate Cleft Contacts (PLIP / ProLIF)</h3>
+            <div style="height: 180px; display: flex; align-items: center; justify-content: center; background: #080c14; border-radius: 8px; border: 1px dashed var(--card-border);">
+              <span class="tag tag-yellow">NOT YET CALCULATED (Pending Trajectory Interaction Analysis)</span>
+            </div>
+          </div>
+
+          <div class="card">
+            <h3>Catalytic Free-Energy Reaction Barrier (QM/MM)</h3>
+            <div style="height: 180px; display: flex; align-items: center; justify-content: center; background: #080c14; border-radius: 8px; border: 1px dashed var(--card-border);">
+              <span class="tag tag-yellow">NOT YET CALCULATED (Pending Milestone 3 QM/MM NEB)</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </main>
+
+  <script>
+    let currentData = null;
+    let currentSnapshotId = null;
+
+    const titles = {
+      inventory: ["Candidate Variant Inventory", "Inspected scientific outputs from verified Q-Catalyst read-only snapshots"],
+      evidence: ["Candidate Evidence Cards", "Deep scientific provenance, sequence alignment, and descriptor breakdown"],
+      explorer: ["3D Structure Explorer", "Interactive WebGL visualization via PDBe Mol* loading local snapshot PDB coordinates"],
+      readiness: ["Simulation Readiness Checklist", "Pre-flight validation ensuring no unphysical simulation runs are launched"],
+      comparison: ["Future Benchmarking & Comparisons", "Standardized comparative metrics strictly marked as NOT YET CALCULATED"]
+    };
+
+    function showView(viewId) {
+      document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
+      event.target.classList.add('active');
+
+      document.querySelectorAll('.view-panel').forEach(p => p.classList.remove('active'));
+      const activePanel = document.getElementById('view-' + viewId);
+      if (activePanel) activePanel.classList.add('active');
+
+      document.getElementById('view-title').innerText = titles[viewId][0];
+      document.getElementById('view-subtitle').innerText = titles[viewId][1];
+
+      if (viewId === 'explorer') {
+        setTimeout(initMolstarDefault, 200);
+      }
+    }
+
+    async function fetchSnapshots() {
+      try {
+        const res = await fetch('/api/snapshots');
+        const data = await res.json();
+        const sel = document.getElementById('snapshot-select');
+        sel.innerHTML = '';
+        data.snapshots.forEach(s => {
+          const opt = document.createElement('option');
+          opt.value = s.snapshot_id;
+          opt.innerText = s.snapshot_id + (s.created_timestamp ? ` (${s.created_timestamp.substring(0, 10)})` : '');
+          sel.appendChild(opt);
+        });
+
+        if (data.snapshots.length > 0) {
+          loadSnapshot(data.snapshots[0].snapshot_id);
+        }
+      } catch (err) {
+        console.error("Failed to load snapshots", err);
+      }
+    }
+
+    async function loadSnapshot(snapId) {
+      currentSnapshotId = snapId;
+      try {
+        const res = await fetch(`/api/candidates?snapshot_id=${snapId}`);
+        currentData = await res.json();
+        renderInventory();
+        populateEvidenceDropdown();
+        populateStructureDropdown();
+      } catch (err) {
+        console.error("Failed to load snapshot details", err);
+      }
+    }
+
+    function renderInventory() {
+      if (!currentData || !currentData.candidates) return;
+      const cands = currentData.candidates;
+
+      document.getElementById('stat-cand-count').innerText = cands.length;
+      document.getElementById('stat-struct-count').innerText = Object.keys(currentData.structures || {}).length;
+      document.getElementById('stat-dft-count').innerText = Object.keys(currentData.dft || {}).length;
+      document.getElementById('stat-quantum-count').innerText = (currentData.quantum?.simulations?.length || 0);
+
+      const tbody = document.getElementById('inventory-table-body');
+      tbody.innerHTML = '';
+
+      cands.forEach(c => {
+        const vid = c.variant_id;
+        const hasSeq = !!currentData.sequences[vid];
+        const hasStruct = !!currentData.structures[vid];
+        const hasDft = !!currentData.dft[vid];
+
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td><strong>${vid}</strong></td>
+          <td><span class="tag tag-blue">${c.mutations_raw || 'WT'}</span></td>
+          <td>${c.is_prior_art ? `<span class="tag tag-yellow">${c.prior_art_name || 'Prior Art'}</span>` : 'Novel'}</td>
+          <td>${c.pred_activity !== null ? c.pred_activity.toFixed(2) + 'x' : '—'}</td>
+          <td><span class="tag ${c.confidence_tier === 'High' ? 'tag-green' : 'tag-yellow'}">${c.confidence_tier || 'Medium'}</span></td>
+          <td>${hasSeq ? '<span class="tag tag-green">Available</span>' : '<span class="tag tag-red">Missing</span>'}</td>
+          <td>${hasStruct ? '<span class="tag tag-green">PDB (Resolved)</span>' : '<span class="tag tag-red">Missing</span>'}</td>
+          <td>${hasDft ? '<span class="tag tag-green">Tier S DFT</span>' : '<span class="tag" style="background: #1f2937; color: #9ca3af;">Pending</span>'}</td>
+          <td><button class="btn" onclick="openEvidence('${vid}')">Inspect</button></td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function populateEvidenceDropdown() {
+      const sel = document.getElementById('evidence-variant-select');
+      sel.innerHTML = '';
+      currentData.candidates.forEach(c => {
+        const opt = document.createElement('option');
+        opt.value = c.variant_id;
+        opt.innerText = `${c.variant_id} (${c.mutations_raw || 'WT'})`;
+        sel.appendChild(opt);
+      });
+      if (currentData.candidates.length > 0) {
+        renderEvidenceCard(currentData.candidates[0].variant_id);
+      }
+    }
+
+    function openEvidence(vid) {
+      document.getElementById('evidence-variant-select').value = vid;
+      renderEvidenceCard(vid);
+      showView('evidence');
+      document.querySelectorAll('.nav-btn')[1].classList.add('active');
+    }
+
+    function renderEvidenceCard(vid) {
+      const cand = currentData.candidates.find(c => c.variant_id === vid);
+      if (!cand) return;
+
+      document.getElementById('evidence-variant-id').innerText = vid;
+      document.getElementById('ev-mutations').innerText = cand.mutations_raw || 'Wild Type';
+      document.getElementById('ev-pred-act').innerText = cand.pred_activity !== null ? `Relative: ${cand.pred_activity.toFixed(2)}x (Rank #${cand.final_rank})` : 'Unpredicted';
+      document.getElementById('ev-unc-status').innerText = cand.aggregate_uncertainty !== null ? `U(x) = ${cand.aggregate_uncertainty.toFixed(3)} [Gate 0 Fallback]` : 'N/A';
+      document.getElementById('ev-reason').innerText = cand.raw_fields?.recommendation_reason || 'No specific rationale recorded in raw ranking.';
+
+      // Chemistry
+      const dft = currentData.dft[vid];
+      if (dft) {
+        document.getElementById('ev-dft-status').className = 'tag tag-green';
+        document.getElementById('ev-dft-status').innerText = 'Tier S Cluster Computed';
+        document.getElementById('ev-dft-details').innerHTML = `
+          E(DFT): ${dft.e_dft_hartree?.toFixed(4) || '—'} Ha | ΔESP(Ser OG): ${dft.delta_esp_kcal_mol ? dft.delta_esp_kcal_mol.toFixed(2) + ' kcal/mol' : '0.00'}<br>
+          Proton Shuttle: ${dft.proton_shuttle_proxy_kcal ? dft.proton_shuttle_proxy_kcal.toFixed(2) + ' kcal/mol' : '—'} | Approach Proxy: ${dft.approach_barrier_proxy_kcal ? dft.approach_barrier_proxy_kcal.toFixed(2) + ' kcal/mol' : '—'}
+        `;
+      } else {
+        document.getElementById('ev-dft-status').className = 'tag';
+        document.getElementById('ev-dft-status').style.background = '#1f2937';
+        document.getElementById('ev-dft-status').style.color = '#9ca3af';
+        document.getElementById('ev-dft-status').innerText = 'NOT_AVAILABLE';
+        document.getElementById('ev-dft-details').innerText = 'Variant was not within the 31 budgeted Tier S PySCF cluster calculation runs.';
+      }
+
+      // Quantum
+      const quant = currentData.quantum?.simulations?.find(q => q.variant_id === vid);
+      if (quant) {
+        document.getElementById('ev-quant-status').className = 'tag tag-blue';
+        document.getElementById('ev-quant-status').innerText = 'Simulated VQE Available';
+        document.getElementById('ev-quant-details').innerText = `Active Space: ${quant.active_space} | VQE: ${quant.e_vqe_hartree?.toFixed(5)} Ha | Error: ${quant.energy_error_kcal_mol?.toFixed(4)} kcal/mol`;
+      } else {
+        document.getElementById('ev-quant-status').className = 'tag';
+        document.getElementById('ev-quant-status').style.background = '#1f2937';
+        document.getElementById('ev-quant-status').style.color = '#9ca3af';
+        document.getElementById('ev-quant-status').innerText = 'NOT_AVAILABLE';
+        document.getElementById('ev-quant-details').innerText = 'No active-space CASCI/VQE simulation performed for this variant.';
+      }
+
+      // Provenance
+      document.getElementById('ev-provenance').innerHTML = `
+        Source file: results/rankings/ranking.parquet<br>
+        Parent study: ${cand.raw_fields?.study_id || 'Q-Catalyst'}<br>
+        Classification: PREDICTED / REPORTED
+      `;
+
+      // Sequence
+      const seq = currentData.sequences[vid];
+      if (seq) {
+        document.getElementById('ev-sequence').innerText = seq.sequence;
+      } else {
+        document.getElementById('ev-sequence').innerText = 'Sequence record not available for this entry.';
+      }
+    }
+
+    function populateStructureDropdown() {
+      const sel = document.getElementById('explorer-pdb-select');
+      sel.innerHTML = `
+        <option value="5XJH.pdb">Reference: 5XJH.pdb (WT IsPETase)</option>
+        <option value="7SH6.pdb">Reference: 7SH6.pdb (FAST-PETase)</option>
+      `;
+      Object.keys(currentData.structures || {}).forEach(vid => {
+        const opt = document.createElement('option');
+        opt.value = `${vid}.pdb`;
+        opt.innerText = `Variant Model: ${vid}.pdb`;
+        sel.appendChild(opt);
+      });
+    }
+
+    let molstarLoaded = false;
+    function initMolstarDefault() {
+      if (!molstarLoaded && currentSnapshotId) {
+        loadPdbIntoMolstar('5XJH.pdb');
+        molstarLoaded = true;
+      }
+    }
+
+    function loadPdbIntoMolstar(pdbName) {
+      if (!currentSnapshotId) return;
+      const viewer = document.getElementById('pdbe-viewer');
+      if (!viewer) return;
+
+      const pdbUrl = `${window.location.origin}/api/pdb/${currentSnapshotId}/${pdbName}`;
+      viewer.setAttribute('custom-data-url', pdbUrl);
+      viewer.setAttribute('custom-data-format', 'pdb');
+      viewer.setAttribute('bg-color-r', '11');
+      viewer.setAttribute('bg-color-g', '15');
+      viewer.setAttribute('bg-color-b', '23');
+      console.log("Loading PDB into Mol*:", pdbUrl);
+    }
+
+    function resetMolstarView() {
+      const viewer = document.getElementById('pdbe-viewer');
+      if (viewer && viewer.viewerInstance) {
+        viewer.viewerInstance.visual.reset({ camera: true, theme: true });
+      }
+    }
+
+    // Initialize on load
+    window.addEventListener('DOMContentLoaded', () => {
+      fetchSnapshots();
+    });
+  </script>
+</body>
+</html>

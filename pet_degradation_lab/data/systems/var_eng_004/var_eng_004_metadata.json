@@ -1,0 +1,22 @@
+{
+  "system_id": "var_eng_004",
+  "is_holo": true,
+  "num_solute_atoms": 4250,
+  "num_waters": 9736,
+  "num_na_ions": 26,
+  "num_cl_ions": 31,
+  "total_particles": 33089,
+  "net_charge": -0.0,
+  "ionic_strength_M": 0.15,
+  "box_dimensions_nm": [
+    7.038267235722515,
+    7.038267235722515,
+    7.038267235722515
+  ],
+  "potential_energy_kj_mol": -409620.96,
+  "is_stable": true,
+  "pdb_path": "/home/luckycelestial/Pavithran/QCatalyst/Q_Catalyst/pet_degradation_lab/data/systems/var_eng_004/var_eng_004_solvated.pdb",
+  "system_xml_path": "/home/luckycelestial/Pavithran/QCatalyst/Q_Catalyst/pet_degradation_lab/data/systems/var_eng_004/var_eng_004_system.xml",
+  "integrator_xml_path": "/home/luckycelestial/Pavithran/QCatalyst/Q_Catalyst/pet_degradation_lab/data/systems/var_eng_004/var_eng_004_integrator.xml",
+  "summary": "System var_eng_004 built (Holo): 33089 particles (4250 solute, 9736 waters, 26 Na+, 31 Cl-), Box: 7.04x7.04x7.04 nm, Net Charge: -0.00 e, Potential Energy: -409621.0 kJ/mol"
+}

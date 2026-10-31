@@ -1,0 +1,162 @@
+{
+  "snapshot_id": "snap_baseline_v1",
+  "risk_record_count": 26,
+  "structural_risks": [
+    {
+      "variant_id": "VAR-ENG-004",
+      "structural_risk_score": 0.618,
+      "active_site_proximity_angstrom": 2.65,
+      "source": "results/rankings/ranking.parquet"
+    },
+    {
+      "variant_id": "VAR-CAN-022",
+      "structural_risk_score": 0.458,
+      "active_site_proximity_angstrom": 2.65,
+      "source": "results/rankings/ranking.parquet"
+    },
+    {
+      "variant_id": "VAR-ENG-002",
+      "structural_risk_score": 0.666,
+      "active_site_proximity_angstrom": 2.73,
+      "source": "results/rankings/ranking.parquet"
+    },
+    {
+      "variant_id": "VAR-ENG-001",
+      "structural_risk_score": 0.397,
+      "active_site_proximity_angstrom": 2.85,
+      "source": "results/rankings/ranking.parquet"
+    },
+    {
+      "variant_id": "VAR-ENG-003",
+      "structural_risk_score": 0.357,
+      "active_site_proximity_angstrom": 2.85,
+      "source": "results/rankings/ranking.parquet"
+    },
+    {
+      "variant_id": "VAR-CAN-025",
+      "structural_risk_score": 0.386,
+      "active_site_proximity_angstrom": 2.73,
+      "source": "results/rankings/ranking.parquet"
+    },
+    {
+      "variant_id": "VAR-CAN-012",
+      "structural_risk_score": 0.277,
+      "active_site_proximity_angstrom": 2.85,
+      "source": "results/rankings/ranking.parquet"
+    },
+    {
+      "variant_id": "VAR-CAN-013",
+      "structural_risk_score": 0.378,
+      "active_site_proximity_angstrom": 2.65,
+      "source": "results/rankings/ranking.parquet"
+    },
+    {
+      "variant_id": "VAR-CAN-018",
+      "structural_risk_score": 0.247,
+      "active_site_proximity_angstrom": 2.85,
+      "source": "results/rankings/ranking.parquet"
+    },
+    {
+      "variant_id": "VAR-CAN-024",
+      "structural_risk_score": 0.239,
+      "active_site_proximity_angstrom": 2.85,
+      "source": "results/rankings/ranking.parquet"
+    },
+    {
+      "variant_id": "VAR-CAN-015",
+      "structural_risk_score": 0.241,
+      "active_site_proximity_angstrom": null,
+      "source": "results/rankings/ranking.parquet"
+    },
+    {
+      "variant_id": "VAR-SNG-006",
+      "structural_risk_score": 0.237,
+      "active_site_proximity_angstrom": null,
+      "source": "results/rankings/ranking.parquet"
+    },
+    {
+      "variant_id": "VAR-SNG-005",
+      "structural_risk_score": 0.306,
+      "active_site_proximity_angstrom": null,
+      "source": "results/rankings/ranking.parquet"
+    },
+    {
+      "variant_id": "VAR-SNG-008",
+      "structural_risk_score": 0.101,
+      "active_site_proximity_angstrom": null,
+      "source": "results/rankings/ranking.parquet"
+    },
+    {
+      "variant_id": "VAR-CAN-021",
+      "structural_risk_score": 0.221,
+      "active_site_proximity_angstrom": 2.85,
+      "source": "results/rankings/ranking.parquet"
+    },
+    {
+      "variant_id": "VAR-CAN-016",
+      "structural_risk_score": 0.233,
+      "active_site_proximity_angstrom": null,
+      "source": "results/rankings/ranking.parquet"
+    },
+    {
+      "variant_id": "VAR-SNG-007",
+      "structural_risk_score": 0.194,
+      "active_site_proximity_angstrom": null,
+      "source": "results/rankings/ranking.parquet"
+    },
+    {
+      "variant_id": "VAR-SNG-009",
+      "structural_risk_score": 0.338,
+      "active_site_proximity_angstrom": null,
+      "source": "results/rankings/ranking.parquet"
+    },
+    {
+      "variant_id": "VAR-CAN-017",
+      "structural_risk_score": 0.211,
+      "active_site_proximity_angstrom": null,
+      "source": "results/rankings/ranking.parquet"
+    },
+    {
+      "variant_id": "VAR-CAN-014",
+      "structural_risk_score": 0.341,
+      "active_site_proximity_angstrom": null,
+      "source": "results/rankings/ranking.parquet"
+    },
+    {
+      "variant_id": "VAR-WT-000",
+      "structural_risk_score": 0.6,
+      "active_site_proximity_angstrom": 2.85,
+      "source": "results/rankings/ranking.parquet"
+    },
+    {
+      "variant_id": "VAR-CAN-023",
+      "structural_risk_score": 0.175,
+      "active_site_proximity_angstrom": null,
+      "source": "results/rankings/ranking.parquet"
+    },
+    {
+      "variant_id": "VAR-CAN-019",
+      "structural_risk_score": 0.166,
+      "active_site_proximity_angstrom": null,
+      "source": "results/rankings/ranking.parquet"
+    },
+    {
+      "variant_id": "VAR-CAN-020",
+      "structural_risk_score": 0.259,
+      "active_site_proximity_angstrom": null,
+      "source": "results/rankings/ranking.parquet"
+    },
+    {
+      "variant_id": "VAR-NEG-010",
+      "structural_risk_score": 0.522,
+      "active_site_proximity_angstrom": null,
+      "source": "results/rankings/ranking.parquet"
+    },
+    {
+      "variant_id": "VAR-NEG-011",
+      "structural_risk_score": 0.301,
+      "active_site_proximity_angstrom": null,
+      "source": "results/rankings/ranking.parquet"
+    }
+  ]
+}
