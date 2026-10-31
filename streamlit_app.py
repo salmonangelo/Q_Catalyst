@@ -14,3 +14,4 @@ if src_path not in sys.path:
 
 app_path = ROOT / "src" / "qcatalyst" / "dashboard" / "app.py"
 runpy.run_path(str(app_path), run_name="__main__")
+
