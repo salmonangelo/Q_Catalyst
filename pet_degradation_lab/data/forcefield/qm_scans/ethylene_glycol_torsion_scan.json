@@ -1,0 +1,63 @@
+{
+  "scan_name": "ethylene_glycol_torsion",
+  "molecule_name": "1_2_dimethoxyethane",
+  "smiles": "COCCOC",
+  "dihedral_atoms": [
+    1,
+    2,
+    3,
+    4
+  ],
+  "angles_deg": [
+    0.0,
+    30.0,
+    60.0,
+    90.0,
+    120.0,
+    150.0,
+    180.0
+  ],
+  "qm_energies_hartree": [
+    -308.8346516318029,
+    -308.8397914182729,
+    -308.8470272566201,
+    -308.84723454743323,
+    -308.84473499931073,
+    -308.84610784903765,
+    -308.84831333033156
+  ],
+  "qm_relative_kcal_mol": [
+    8.573,
+    5.348,
+    0.807,
+    0.677,
+    2.245,
+    1.384,
+    0.0
+  ],
+  "mm_generic_kcal_mol": [
+    4.6,
+    5.331,
+    5.25,
+    2.3,
+    -0.65,
+    -0.731,
+    0.0
+  ],
+  "mm_refined_kcal_mol": [
+    -2.4,
+    -2.639,
+    -3.0,
+    -2.8,
+    -1.8,
+    -0.561,
+    0.0
+  ],
+  "rmse_generic_kcal_mol": 2.7,
+  "rmse_refined_kcal_mol": 5.744,
+  "mae_generic_kcal_mol": 2.152,
+  "mae_refined_kcal_mol": 4.605,
+  "qm_barrier_kcal_mol": 8.57,
+  "mm_refined_barrier_kcal_mol": 0.0,
+  "summary_path": "/home/luckycelestial/Pavithran/QCatalyst/Q_Catalyst/pet_degradation_lab/data/forcefield/qm_scans/ethylene_glycol_torsion_scan.json"
+}

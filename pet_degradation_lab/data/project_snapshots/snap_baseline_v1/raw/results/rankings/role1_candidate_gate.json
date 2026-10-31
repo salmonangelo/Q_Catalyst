@@ -1,0 +1,33 @@
+{
+  "pipeline_component": "role1_candidate_gate",
+  "parent_enzyme": "IsPETase",
+  "target_name": "activity",
+  "split_version": "v2",
+  "n_train": 84,
+  "n_held_out_candidates": 65,
+  "train_eval_id_overlap": 0,
+  "n_eligible_for_acquisition": 65,
+  "n_ineligible_for_acquisition": 0,
+  "n_chemistry_mapping_eligible": 65,
+  "gate_policy": {
+    "gate0_verdict": "FAIL",
+    "gate_passed": false,
+    "acquisition_mode": "diversity_fallback",
+    "uncertainty_gating_enabled": false,
+    "ci_lower": -0.5985095985836703,
+    "ci_upper": -0.13515508785330269,
+    "policy_valid": true,
+    "policy_errors": [],
+    "rationale": "Gate 0 shows an inverse uncertainty/error association. Do not filter candidates using uncertainty; use diversity-based selection."
+  },
+  "input_artifacts": {
+    "variants": "C:\\Users\\Asus\\Desktop\\QHacks\\qcatalyst\\data\\curated\\variants.parquet",
+    "predictions": "C:\\Users\\Asus\\Desktop\\QHacks\\qcatalyst\\results\\predictions\\predictions.parquet",
+    "uncertainty": "C:\\Users\\Asus\\Desktop\\QHacks\\qcatalyst\\results\\uncertainty\\uncertainty.parquet",
+    "esm1v_scores": "C:\\Users\\Asus\\Desktop\\QHacks\\qcatalyst\\results\\predictions\\esm1v_scores.parquet",
+    "gate0_verdict": "C:\\Users\\Asus\\Desktop\\QHacks\\qcatalyst\\reports\\tables\\gate0_verdict.json",
+    "split_manifest": "C:\\Users\\Asus\\Desktop\\QHacks\\qcatalyst\\data\\splits\\ispetase_activity_single_to_multi_v2.json"
+  },
+  "output_artifact": "C:\\Users\\Asus\\Desktop\\QHacks\\qcatalyst\\results\\rankings\\role1_candidate_gate.parquet",
+  "disclaimer": "Computational candidate prioritisation from retrospective labels; not experimentally verified improvement in PET degradation."
+}
