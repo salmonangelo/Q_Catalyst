@@ -106,4 +106,72 @@ def test_viewer3d_capabilities():
     assert "Substrate Binding" in html
     assert "Mutation Inspector" in html
 
+    # 6. Verify New Visual Context Capabilities:
+    # Requirement 1: Interactive Hover Labels (Tooltips)
+    assert "hover_tooltip_test_view" in html
+    assert "setHoverable" in html
+    assert "Catalytic Nucleophile" in html
+    
+    # Requirement 2: The "Active Site" Highlight (Translucent Red Surface)
+    assert "addSurface" in html
+    assert "#EF4444" in html
+    assert "opacity: 0.3" in html or "0.30" in html
+
+    # Requirement 3: The Distance Line & Measurement
+    assert "drawDistanceLineToTriad_test_view" in html
+    assert "ins_dist_test_view" in html
+    assert "#FBBF24" in html
+
+    # Requirement 4: Fixed Labels for Main Triad (Ser160, Asp206, His237)
+    assert "addFixedTriadLabels_test_view" in html
+    assert "Ser160" in html
+    assert "Asp206" in html
+    assert "His237" in html
+    assert "#FFFFFF" in html
+
+
+def test_dynamic_pdb_loader_and_missing_metadata():
+    from src.qcatalyst.dashboard.viewer3d import (
+        CATALYTIC_TRIAD_RESIS,
+        SUBSTRATE_BINDING_RESIS,
+        parse_pdb_ca_and_functional,
+        generate_3dmol_html
+    )
+
+    variants_dir = PROJECT_ROOT / "data" / "structures" / "variants"
+    test_pdb = variants_dir / "TEST-NEW-001.pdb"
+    assert test_pdb.exists(), "TEST-NEW-001.pdb must exist in data/structures/variants/"
+
+    # Test dynamic file scanning logic
+    known_vids = {"VAR-ENG-001", "VAR-ENG-002", "VAR-WT-000"}
+    custom_pdbs = sorted([p for p in variants_dir.glob("*.pdb") if p.stem not in known_vids and p.stem not in ["5XJH", "7SH6"]])
+    custom_names = [p.name for p in custom_pdbs]
+    assert "TEST-NEW-001.pdb" in custom_names
+
+    # Test reading and parsing of custom PDB
+    content = test_pdb.read_text(encoding="utf-8", errors="ignore")
+    ca_map, atom_map, resis = parse_pdb_ca_and_functional(content)
+    assert len(ca_map) > 200, f"Expected >200 residues, got {len(ca_map)}"
+
+    # Test 3Dmol viewer generation with missing metadata (raw structure)
+    triad = [r for r in CATALYTIC_TRIAD_RESIS if r in resis]
+    sub = [r for r in SUBSTRATE_BINDING_RESIS if r in resis]
+    raw_html = generate_3dmol_html(
+        viewer_id="test_raw_view",
+        models=[{"pdb": content[:10000], "role": "variant", "mut_resis": []}],
+        triad_resis=triad,
+        substrate_resis=sub,
+        interaction_lines=[],
+        mutation_info={},
+        dark_mode=False,
+        title="TEST-NEW-001 — Uploaded Custom Structure",
+        subtitle=f"Raw PDB Structure ({len(ca_map)} Resolved Residues) | Generic Backbone & Catalytic Sites",
+        show_inspector_panel=True
+    )
+    assert "TEST-NEW-001" in raw_html
+    assert "Raw PDB Structure" in raw_html
+    assert "Structural Inspector: Raw Variant Structure" in raw_html
+    assert "3Dmol" in raw_html
+
+
 
