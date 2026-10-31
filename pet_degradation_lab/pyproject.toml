@@ -1,0 +1,41 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pet-degradation-lab"
+version = "0.1.0"
+description = "Independent research module for PETase degradation dynamics, substrate interaction, and reaction-energy analysis."
+authors = [{ name = "Q-Catalyst PET Degradation Research Group" }]
+license = { text = "MIT" }
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "pydantic>=2.0",
+    "pandas>=2.0",
+    "pyarrow>=12.0",
+    "biopython>=1.80",
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+]
+visualization = [
+    "streamlit>=1.30",
+    "plotly>=5.18",
+]
+# Future heavy simulation dependencies (Milestone 2+)
+simulation = [
+    "openmm>=8.0",
+    "mdanalysis>=2.5",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["schemas*", "ingestion*", "preparation*", "simulation*", "analysis*", "reaction_chemistry*", "benchmarking*", "visualization*", "scripts*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]

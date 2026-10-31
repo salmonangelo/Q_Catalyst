@@ -1,0 +1,31 @@
+{
+  "candidate_id": "W159H_HID_p-70",
+  "mutation": "W159H",
+  "tautomer": "HID",
+  "rotamer_name": "p-70",
+  "target_chi1_deg": 65.0,
+  "target_chi2_deg": -70.0,
+  "actual_chi1_deg": 65.0,
+  "actual_chi2_deg": -70.0,
+  "atom_completeness": true,
+  "total_atoms": 17,
+  "heavy_atoms": 10,
+  "hydrogen_atoms": 7,
+  "net_formal_charge": 0,
+  "sum_partial_charges": 0.175,
+  "backbone_preserved": true,
+  "ca_rmsd_angstrom": 0.0,
+  "backbone_rmsd_angstrom": 0.0,
+  "steric_clashes_below_2A": 7,
+  "min_scaffold_distance_angstrom": 0.604,
+  "initial_energy_kcal_mol": 0.0,
+  "minimized_energy_kcal_mol": 0.0,
+  "energy_delta_kcal_mol": 0.0,
+  "convergence_status": "unminimized",
+  "validation_verdict": "FAIL",
+  "details": {
+    "ring_closure_CE1_NE2_dist": 1.327,
+    "protonated_nitrogen": "ND1",
+    "hbond_acceptor_nitrogen": "NE2"
+  }
+}

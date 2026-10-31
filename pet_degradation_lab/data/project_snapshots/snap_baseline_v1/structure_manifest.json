@@ -1,0 +1,214 @@
+{
+  "snapshot_id": "snap_baseline_v1",
+  "structure_count": 26,
+  "structures": [
+    {
+      "variant_id": "VAR-ENG-004",
+      "model_id": "PDB_VAR-ENG-004",
+      "file_path": "raw/data/structures/variants/VAR-ENG-004.pdb",
+      "sha256": "07c90421ea64715573a6ae0863bd69879b8e9c6b06c73a18eaf5a0b02d749583",
+      "file_size": 171621,
+      "structure_source": "VARIANT_RELAXED_PDB"
+    },
+    {
+      "variant_id": "VAR-CAN-022",
+      "model_id": "PDB_VAR-CAN-022",
+      "file_path": "raw/data/structures/variants/VAR-CAN-022.pdb",
+      "sha256": "2f40a79edbb2c777a8590030de6a6fe8d8bfdbf70bb58672baf45c1294b957ff",
+      "file_size": 171504,
+      "structure_source": "VARIANT_RELAXED_PDB"
+    },
+    {
+      "variant_id": "VAR-ENG-002",
+      "model_id": "PDB_VAR-ENG-002",
+      "file_path": "raw/data/structures/variants/VAR-ENG-002.pdb",
+      "sha256": "6b3bea2929ea4a58f256b6910679b2689c6ee0b968ca8dac27504185bc8be5c7",
+      "file_size": 172302,
+      "structure_source": "VARIANT_RELAXED_PDB"
+    },
+    {
+      "variant_id": "VAR-ENG-001",
+      "model_id": "PDB_VAR-ENG-001",
+      "file_path": "raw/data/structures/variants/VAR-ENG-001.pdb",
+      "sha256": "f3659e0bc905dfc1f254fb875ae703546febac769af6ce1d356d6096683d83bd",
+      "file_size": 193666,
+      "structure_source": "VARIANT_RELAXED_PDB"
+    },
+    {
+      "variant_id": "VAR-ENG-003",
+      "model_id": "PDB_VAR-ENG-003",
+      "file_path": "raw/data/structures/variants/VAR-ENG-003.pdb",
+      "sha256": "82c8d7c9782a22db787b13e0b312169563404cbd043dbfe975da61bb4241a14a",
+      "file_size": 171248,
+      "structure_source": "VARIANT_RELAXED_PDB"
+    },
+    {
+      "variant_id": "VAR-CAN-025",
+      "model_id": "PDB_VAR-CAN-025",
+      "file_path": "raw/data/structures/variants/VAR-CAN-025.pdb",
+      "sha256": "45193538a25e446501f2bf806c0b6b7d59e689e4ae2409ddfab7ccb73b9f28c8",
+      "file_size": 170751,
+      "structure_source": "VARIANT_RELAXED_PDB"
+    },
+    {
+      "variant_id": "VAR-CAN-012",
+      "model_id": "PDB_VAR-CAN-012",
+      "file_path": "raw/data/structures/variants/VAR-CAN-012.pdb",
+      "sha256": "0c11d3948dc5fe47e6a9c85b3248d366070cb3f4797ae43d479d69e8664650ef",
+      "file_size": 171721,
+      "structure_source": "VARIANT_RELAXED_PDB"
+    },
+    {
+      "variant_id": "VAR-CAN-013",
+      "model_id": "PDB_VAR-CAN-013",
+      "file_path": "raw/data/structures/variants/VAR-CAN-013.pdb",
+      "sha256": "874475d724fc0abe995c1f999a0c732d52d32533b6d4bd74cf3dfff4e65c3fab",
+      "file_size": 171066,
+      "structure_source": "VARIANT_RELAXED_PDB"
+    },
+    {
+      "variant_id": "VAR-CAN-018",
+      "model_id": "PDB_VAR-CAN-018",
+      "file_path": "raw/data/structures/variants/VAR-CAN-018.pdb",
+      "sha256": "60b16d4cfdf3a2bb8c6e2f6483e6fe29ad3b86dae43d4bfcbb6545a93d89cfde",
+      "file_size": 171237,
+      "structure_source": "VARIANT_RELAXED_PDB"
+    },
+    {
+      "variant_id": "VAR-CAN-024",
+      "model_id": "PDB_VAR-CAN-024",
+      "file_path": "raw/data/structures/variants/VAR-CAN-024.pdb",
+      "sha256": "6e30adbd69a1afc78db5536b3ca26a9612f5a073faa5af08e25d26c6e808dcd5",
+      "file_size": 171147,
+      "structure_source": "VARIANT_RELAXED_PDB"
+    },
+    {
+      "variant_id": "VAR-CAN-015",
+      "model_id": "PDB_VAR-CAN-015",
+      "file_path": "raw/data/structures/variants/VAR-CAN-015.pdb",
+      "sha256": "7c6b7947d9244dad9c64349f8ccdbf3612f196ef3acc990f8fc8f6b12d5bda9c",
+      "file_size": 171550,
+      "structure_source": "VARIANT_RELAXED_PDB"
+    },
+    {
+      "variant_id": "VAR-SNG-006",
+      "model_id": "PDB_VAR-SNG-006",
+      "file_path": "raw/data/structures/variants/VAR-SNG-006.pdb",
+      "sha256": "7a0f796afbe93428a30bb41d50c59387348e2c0b2fcb82495107a80622654fb6",
+      "file_size": 171545,
+      "structure_source": "VARIANT_RELAXED_PDB"
+    },
+    {
+      "variant_id": "VAR-SNG-005",
+      "model_id": "PDB_VAR-SNG-005",
+      "file_path": "raw/data/structures/variants/VAR-SNG-005.pdb",
+      "sha256": "82740d045a15f3dbb0c8e9df6951d469c17d2475bfe21693ae84a0475041fc5f",
+      "file_size": 170974,
+      "structure_source": "VARIANT_RELAXED_PDB"
+    },
+    {
+      "variant_id": "VAR-SNG-008",
+      "model_id": "PDB_VAR-SNG-008",
+      "file_path": "raw/data/structures/variants/VAR-SNG-008.pdb",
+      "sha256": "4770db3c1694deaaff113364c447ee80603bea07ef9fcd44efb7f0c68e91bb91",
+      "file_size": 170803,
+      "structure_source": "VARIANT_RELAXED_PDB"
+    },
+    {
+      "variant_id": "VAR-CAN-021",
+      "model_id": "PDB_VAR-CAN-021",
+      "file_path": "raw/data/structures/variants/VAR-CAN-021.pdb",
+      "sha256": "55b48f4795e78f80cd321d6269e44636a9fac1804bd5d9332d4bbab6c436b6d7",
+      "file_size": 171803,
+      "structure_source": "VARIANT_RELAXED_PDB"
+    },
+    {
+      "variant_id": "VAR-CAN-016",
+      "model_id": "PDB_VAR-CAN-016",
+      "file_path": "raw/data/structures/variants/VAR-CAN-016.pdb",
+      "sha256": "59b34ab6cddc2d5f80b304115d564fb26c53a1c75eba047e87fae84b0ef45dbe",
+      "file_size": 171553,
+      "structure_source": "VARIANT_RELAXED_PDB"
+    },
+    {
+      "variant_id": "VAR-SNG-007",
+      "model_id": "PDB_VAR-SNG-007",
+      "file_path": "raw/data/structures/variants/VAR-SNG-007.pdb",
+      "sha256": "e187eee28dcea9454023c869e45a52d041e7984f5b040eb72ea314153765d049",
+      "file_size": 171456,
+      "structure_source": "VARIANT_RELAXED_PDB"
+    },
+    {
+      "variant_id": "VAR-SNG-009",
+      "model_id": "PDB_VAR-SNG-009",
+      "file_path": "raw/data/structures/variants/VAR-SNG-009.pdb",
+      "sha256": "db6b5ebfdcd67622699bdd2ba37ad74d4ba8bf72600e753ead4862fd8fa67feb",
+      "file_size": 171377,
+      "structure_source": "VARIANT_RELAXED_PDB"
+    },
+    {
+      "variant_id": "VAR-CAN-017",
+      "model_id": "PDB_VAR-CAN-017",
+      "file_path": "raw/data/structures/variants/VAR-CAN-017.pdb",
+      "sha256": "25e5954af545030f67611d1efcbf4cbc9e4843b0568f0dea0a445806b24c544b",
+      "file_size": 171546,
+      "structure_source": "VARIANT_RELAXED_PDB"
+    },
+    {
+      "variant_id": "VAR-CAN-014",
+      "model_id": "PDB_VAR-CAN-014",
+      "file_path": "raw/data/structures/variants/VAR-CAN-014.pdb",
+      "sha256": "78cbdf28747038b914b25f2a10236afae09d9ce57f83a8951e500d3a85a2f0e5",
+      "file_size": 171381,
+      "structure_source": "VARIANT_RELAXED_PDB"
+    },
+    {
+      "variant_id": "VAR-WT-000",
+      "model_id": "PDB_VAR-WT-000",
+      "file_path": "raw/data/structures/variants/VAR-WT-000.pdb",
+      "sha256": "e80dcb4da6530b7d35b3f65ab657eccc3e09b19b34a6588bfd8bc04dadade060",
+      "file_size": 171293,
+      "structure_source": "VARIANT_RELAXED_PDB"
+    },
+    {
+      "variant_id": "VAR-CAN-023",
+      "model_id": "PDB_VAR-CAN-023",
+      "file_path": "raw/data/structures/variants/VAR-CAN-023.pdb",
+      "sha256": "1476456f5104e30dcb04d6879b8af4a6846623b654ac9261733aa6821f739439",
+      "file_size": 171399,
+      "structure_source": "VARIANT_RELAXED_PDB"
+    },
+    {
+      "variant_id": "VAR-CAN-019",
+      "model_id": "PDB_VAR-CAN-019",
+      "file_path": "raw/data/structures/variants/VAR-CAN-019.pdb",
+      "sha256": "95d6abd2362dd97db24ec405e6eb831f4b6a213553f077d29b038ae04eb1aae2",
+      "file_size": 171058,
+      "structure_source": "VARIANT_RELAXED_PDB"
+    },
+    {
+      "variant_id": "VAR-CAN-020",
+      "model_id": "PDB_VAR-CAN-020",
+      "file_path": "raw/data/structures/variants/VAR-CAN-020.pdb",
+      "sha256": "28e26e2357a57814ffea70188bd459eb3ad97863128720b2941c1b8ec6006a63",
+      "file_size": 171219,
+      "structure_source": "VARIANT_RELAXED_PDB"
+    },
+    {
+      "variant_id": "VAR-NEG-010",
+      "model_id": "PDB_VAR-NEG-010",
+      "file_path": "raw/data/structures/variants/VAR-NEG-010.pdb",
+      "sha256": "7b32cc184fe8e28624487c3ea3caf1490f9cb7036b74638aafcfa39e7dcb87a6",
+      "file_size": 171225,
+      "structure_source": "VARIANT_RELAXED_PDB"
+    },
+    {
+      "variant_id": "VAR-NEG-011",
+      "model_id": "PDB_VAR-NEG-011",
+      "file_path": "raw/data/structures/variants/VAR-NEG-011.pdb",
+      "sha256": "e840f2e57386f599c5bea1227cf775e0e854ea019bab5927c890725d1156b9c0",
+      "file_size": 170895,
+      "structure_source": "VARIANT_RELAXED_PDB"
+    }
+  ]
+}

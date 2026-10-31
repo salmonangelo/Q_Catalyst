@@ -1,0 +1,72 @@
+{
+  "title": "Q-Catalyst Active-Space Electronic Hamiltonian Handoff",
+  "target_role": "Role 3 (Quantum Lead - VQE)",
+  "provenance": {
+    "engine": "PySCF 2.14.0",
+    "method": "RHF with AMBER ff14SB QM/MM Point-Charge Embedding",
+    "active_space_method": "CASCI",
+    "basis": "def2-svp",
+    "density_fitting": true,
+    "conv_tol": 1e-06,
+    "timestamp": "2026-10-30T01:23:42Z"
+  },
+  "units": {
+    "energy": "Hartree (Ha)",
+    "distance": "Angstrom (Cartesian coordinates) / Bohr (internal electronic structure)",
+    "charge": "Elementary charge (e)"
+  },
+  "electronic_structure": {
+    "natoms": 42,
+    "nbasis": 390,
+    "nelectron_total": 158,
+    "charge": -1,
+    "spin": 0,
+    "ncore_orbitals": 77,
+    "ncas_orbitals": 4,
+    "nelecas": [
+      2,
+      2
+    ],
+    "active_orbital_indices": [
+      77,
+      78,
+      79,
+      80
+    ],
+    "active_orbital_energies_ha": [
+      4.147615831752265,
+      4.254383841613652,
+      4.298356807762703,
+      4.3597642588991405
+    ]
+  },
+  "convergence": {
+    "hf_converged": true,
+    "casci_converged": true
+  },
+  "energies_hartree": {
+    "e_hf_ref": -1024.1988022357216,
+    "e_casci_total": -1024.2596230878212,
+    "correlation_energy_ha": -0.06082085,
+    "energy_core_constant": -1039.548062298389
+  },
+  "qubit_mapping_specifications": {
+    "qubits_jordan_wigner": 8,
+    "qubits_parity_mapping_with_z2_reduction": 6,
+    "spin_orbital_ordering": "Interleaved (spatial 0 alpha, spatial 0 beta, ...)",
+    "hamiltonian_form": "H = energy_core + sum_pq h1eff[p,q] a_p^dag a_q + 0.5 sum_pqrs h2eff[p,q,r,s] a_p^dag a_r^dag a_s a_q (physicist) or 0.5 sum_pqrs (pq|rs) a_p^dag a_q^dag a_s a_r (chemist)"
+  },
+  "artifact_files": {
+    "arrays_npz": "wt_active_space_hamiltonian.npz",
+    "fcidump": "wt_active_space_hamiltonian.fcidump"
+  },
+  "variant_metadata": {
+    "variant_id": "VAR_WT",
+    "mutation": "WT",
+    "pdb_structure": "5XJH (Chain A)",
+    "qm_cluster_tier": "Tier S (42 atoms)",
+    "mm_point_charges_count": 563,
+    "mm_net_charge_e": -86.67969999999998,
+    "boundary_exclusion_fix": "All atoms of residues {160, 237, 206, 161} excluded from MM point charges"
+  }
+}

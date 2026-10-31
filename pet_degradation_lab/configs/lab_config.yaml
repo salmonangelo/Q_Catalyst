@@ -1,0 +1,67 @@
+# Q-Catalyst PET Degradation Lab Configuration
+lab:
+  module_name: "pet_degradation_lab"
+  version: "0.1.0"
+  target_python: "3.12"
+
+snapshot:
+  default_source_root: ".."  # Relative to pet_degradation_lab root
+  storage_directory: "data/project_snapshots"
+  checksum_algorithm: "sha256"
+  allowlist_patterns:
+    - "results/rankings/role1_candidate_gate.json"
+    - "results/rankings/role1_candidate_gate.parquet"
+    - "results/rankings/ranking.parquet"
+    - "results/predictions/predictions.parquet"
+    - "results/predictions/esm1v_scores.parquet"
+    - "results/uncertainty/uncertainty.parquet"
+    - "results/uncertainty/gate0_report.json"
+    - "results/chemistry/chem_results.parquet"
+    - "results/chemistry/chem_jobs.json"
+    - "results/chemistry/tier_s_cluster.xyz"
+    - "results/chemistry/fast_petase_directional_check.json"
+    - "results/quantum/casci_control_role3.json"
+    - "results/quantum/quantum_results.parquet"
+    - "data/curated/variants.parquet"
+    - "data/structures/5XJH.pdb"
+    - "data/structures/7SH6.pdb"
+    - "data/structures/variants/*.pdb"
+    - "reports/gate0_validation_report.md"
+    - "reports/benchmark_report.md"
+    - "reports/final_report.md"
+
+enzyme_targets:
+  reference_enzyme: "IsPETase"
+  reference_structure_pdb: "5XJH"
+  mature_numbering_offset: 0  # 5XJH numbering uses mature residues 37-290
+  catalytic_triad:
+    serine: 160
+    histidine: 237
+    aspartate: 206
+  oxyanion_hole:
+    backbone_donors: [161, 87]
+  substrate_binding_subsite: [87, 161, 185, 208, 238]
+
+evidence_classification:
+  experimental_keys:
+    - "activity_raw"
+    - "relative_activity"
+    - "tm_raw"
+    - "tm_c"
+    - "delta_tm"
+  predicted_keys:
+    - "pred_activity"
+    - "pred_delta_tm"
+    - "zero_shot_esm_score"
+    - "esm1v_score"
+    - "aggregate_uncertainty"
+    - "conformal_lower"
+    - "conformal_upper"
+  computed_keys:
+    - "e_dft"
+    - "e_hf"
+    - "esp_at_ser_og_kcal_mol"
+    - "proton_shuttle_proxy_kcal"
+    - "approach_barrier_proxy_kcal"
+    - "e_casci_hartree"
+    - "e_vqe_hartree"

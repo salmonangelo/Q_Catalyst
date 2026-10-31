@@ -139,6 +139,132 @@ def score_arm_a2_xgboost_structural(
     return y_pred * (1.0 + alpha_struct * s_risk)
 
 
+# -------------------------------------------------------------
+# Role 3 Quantum Active-Space Contract Columns & Loader
+# -------------------------------------------------------------
+REQUIRED_QUANTUM_CONTRACT_COLUMNS = [
+    "variant_id",
+    "active_space",
+    "num_spatial_orbitals",
+    "num_active_electrons",
+    "num_qubits",
+    "ansatz",
+    "ansatz_parameters",
+    "transpiled_circuit_depth",
+    "two_qubit_gate_count",
+    "optimizer",
+    "casci_energy_hartree",
+    "quantum_casci_reference_energy_hartree",
+    "vqe_energy_hartree",
+    "absolute_vqe_error_hartree",
+    "simulation_type",
+    "provenance",
+]
+
+NUMERIC_FLOAT_COLUMNS = [
+    "casci_energy_hartree",
+    "quantum_casci_reference_energy_hartree",
+    "vqe_energy_hartree",
+    "absolute_vqe_error_hartree",
+]
+
+NUMERIC_INT_COLUMNS = [
+    "num_spatial_orbitals",
+    "num_active_electrons",
+    "num_qubits",
+    "ansatz_parameters",
+    "transpiled_circuit_depth",
+    "two_qubit_gate_count",
+]
+
+
+def load_quantum_results(
+    parquet_path: str | Path = Path("results/quantum/quantum_results.parquet"),
+    error_tolerance: float = 1e-10,
+) -> pd.DataFrame:
+    """Load and validate the Role 3 quantum results Parquet file.
+
+    IMPORTANT SCIENTIFIC CONSTRAINTS:
+    - WT quantum CASCI and VQE values belong to the same quantum Hamiltonian context.
+      Never compare the quantum WT CASCI energy directly against Role 2's differently
+      constructed chemistry CASCI energy as a variant-ranking score.
+    - Treat WT as an external reference anchor. Do not join it directly into
+      variants.parquet or uncertainty.parquet.
+    - Benchmark arms A5 (CASCI control), A6 (Noiseless VQE), and A7 (Noisy VQE)
+      must remain pending until comparable candidate-level quantum active-space
+      results are generated across screening mutants.
+
+    Args:
+        parquet_path: Path to quantum_results.parquet (default: results/quantum/quantum_results.parquet).
+        error_tolerance: Maximum allowable difference between reported VQE error
+            and |VQE - CASCI| (default: 1e-10 Ha).
+
+    Returns:
+        Validated pandas DataFrame containing the quantum results.
+
+    Raises:
+        FileNotFoundError: If parquet_path does not exist.
+        ValueError: If required columns are missing, WT anchor is absent or duplicated,
+            energies are non-finite, or absolute_vqe_error_hartree is inconsistent.
+        TypeError: If column data types do not conform to expected schema.
+    """
+    path = Path(parquet_path)
+    if not path.exists():
+        raise FileNotFoundError(f"Quantum results Parquet file not found at: {path}")
+
+    try:
+        df = pd.read_parquet(path)
+    except Exception as e:
+        raise ValueError(f"Failed to read quantum results Parquet file at {path}: {e}") from e
+
+    # 1. Required contract columns validation
+    missing_cols = [col for col in REQUIRED_QUANTUM_CONTRACT_COLUMNS if col not in df.columns]
+    if missing_cols:
+        raise ValueError(f"Quantum results Parquet missing required contract columns: {missing_cols}")
+
+    # 2. Data types validation
+    for col in NUMERIC_FLOAT_COLUMNS:
+        if not pd.api.types.is_numeric_dtype(df[col]):
+            raise TypeError(f"Column '{col}' must have a numeric float data type, got {df[col].dtype}")
+
+    for col in NUMERIC_INT_COLUMNS:
+        if not pd.api.types.is_numeric_dtype(df[col]):
+            raise TypeError(f"Column '{col}' must have a numeric integer data type, got {df[col].dtype}")
+
+    # 3. Exactly one WT anchor record
+    wt_rows = df[df["variant_id"] == "VAR_WT"]
+    if wt_rows.empty:
+        raise ValueError("Quantum results must contain a 'VAR_WT' reference record.")
+    if len(wt_rows) > 1:
+        raise ValueError(f"Expected exactly one 'VAR_WT' reference record, found {len(wt_rows)} duplicate records.")
+
+    # 4. Energy finiteness validation
+    wt_row = wt_rows.iloc[0]
+    casci_val = float(wt_row["quantum_casci_reference_energy_hartree"])
+    vqe_val = float(wt_row["vqe_energy_hartree"])
+
+    if not (np.isfinite(casci_val) and np.isfinite(vqe_val)):
+        raise ValueError(
+            f"Quantum CASCI and VQE energies must be finite numbers; got CASCI={casci_val}, VQE={vqe_val}"
+        )
+
+    # 5. Energy error numerical consistency check
+    reported_error = float(wt_row["absolute_vqe_error_hartree"])
+    if not np.isfinite(reported_error) or reported_error < 0.0:
+        raise ValueError(f"absolute_vqe_error_hartree must be a non-negative finite float, got {reported_error}")
+
+    expected_error = abs(vqe_val - casci_val)
+    diff = abs(reported_error - expected_error)
+    if diff > error_tolerance:
+        raise ValueError(
+            f"Inconsistent absolute_vqe_error_hartree: reported {reported_error:.12e} Ha "
+            f"differs from |VQE - CASCI| ({expected_error:.12e} Ha) by {diff:.3e} Ha, "
+            f"exceeding numerical tolerance {error_tolerance:.1e} Ha."
+        )
+
+    return df
+
+
 def run_benchmark_suite(
     variants_path: Path,
     predictions_path: Path,

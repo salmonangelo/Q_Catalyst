@@ -19,11 +19,8 @@ import streamlit.components.v1 as components
 
 # Ensure project root and src directory are in sys.path
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent.parent
-SRC_DIR = PROJECT_ROOT / "src"
-if str(SRC_DIR) not in sys.path:
-    sys.path.insert(0, str(SRC_DIR))
-if str(PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(PROJECT_ROOT))
+sys.path.insert(0, str(PROJECT_ROOT))
+sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
 from src.qcatalyst.data.loader import ISPETASE_WT_SEQUENCE, CATALYTIC_TRIAD, OXYANION_HOLE
 from src.qcatalyst.structure.pdb_parser import RESIDUE_COORDINATES_5XJH, SUBSTRATE_POSE
@@ -258,6 +255,7 @@ def inject_custom_theme(is_dark: bool):
         .funnel-step-box,
         [data-testid="stMetric"],
         [data-testid="stPlotlyChart"],
+        [data-testid="stVerticalBlockBorderWrapper"],
         .page-insight-box {
             background: #FFFFFF !important;
             background-color: #FFFFFF !important;
@@ -495,6 +493,40 @@ def inject_custom_theme(is_dark: bool):
             border-color: #172554 !important;
             color: #FFFFFF !important;
             box-shadow: 0 4px 10px rgba(15, 23, 42, 0.2) !important;
+        }
+
+        /* Secondary Button: Clean Light Slate */
+        button[kind="secondary"], .stButton > button[kind="secondary"] {
+            background: #F1F5F9 !important;
+            background-color: #F1F5F9 !important;
+            color: #1E3A8A !important;
+            border: 1px solid #CBD5E1 !important;
+            border-radius: 6px !important;
+            font-weight: 600 !important;
+            box-shadow: none !important;
+            transition: all 0.15s ease !important;
+        }
+        button[kind="secondary"]:hover, .stButton > button[kind="secondary"]:hover {
+            background: #E2E8F0 !important;
+            background-color: #E2E8F0 !important;
+            color: #0F172A !important;
+            border-color: #94A3B8 !important;
+        }
+
+        /* File Uploader Drag-and-Drop Card */
+        [data-testid="stFileUploader"] {
+            margin-bottom: 0px !important;
+        }
+        [data-testid="stFileUploader"] section {
+            padding: 0.65rem 1rem !important;
+            border: 1.5px dashed #CBD5E1 !important;
+            border-radius: 6px !important;
+            background: #F8FAFC !important;
+            transition: all 0.2s ease !important;
+        }
+        [data-testid="stFileUploader"] section:hover {
+            border-color: #1E3A8A !important;
+            background: #EFF6FF !important;
         }
 
         /* Table & Dataframe Light: Pure White Background, Fully Visible Content, Clean Header, Alternating Rows */
@@ -1851,6 +1883,7 @@ def load_all_pipeline_data():
     df_unc = pd.read_parquet(res_dir / "uncertainty" / "uncertainty.parquet") if (res_dir / "uncertainty" / "uncertainty.parquet").exists() else pd.DataFrame()
     df_chem = pd.read_parquet(res_dir / "chemistry" / "chem_results.parquet") if (res_dir / "chemistry" / "chem_results.parquet").exists() else pd.DataFrame()
     df_quant = pd.read_parquet(res_dir / "quantum" / "quantum_results.parquet") if (res_dir / "quantum" / "quantum_results.parquet").exists() else pd.DataFrame()
+    df_quant_sim = pd.read_parquet(res_dir / "quantum" / "quantum_results_simulated.parquet") if (res_dir / "quantum" / "quantum_results_simulated.parquet").exists() else pd.DataFrame()
     df_ranking = pd.read_parquet(res_dir / "rankings" / "ranking.parquet") if (res_dir / "rankings" / "ranking.parquet").exists() else pd.DataFrame()
 
     # 1. Normalize Chemistry descriptors so all dashboard views work flawlessly
@@ -1904,6 +1937,7 @@ def load_all_pipeline_data():
         "uncertainty": df_unc,
         "chemistry": df_chem,
         "quantum": df_quant,
+        "quantum_sim": df_quant_sim,
         "ranking": df_ranking,
         "benchmarks": df_bench,
         "gate0": gate0_report,
@@ -2924,21 +2958,40 @@ elif menu_selection in ["5. Computational Chemistry & VQE", "VQE"]:
     with tab_quant:
         st.markdown("#### Quantum Active Space (4e, 4o) on 8 Qubits")
         st.write("Validation of parameterised VQE simulator against exact classical CASCI reference ground state:")
-        if not df_quant.empty:
-            noiseless = df_quant[df_quant["noise_level"] == 0.0]
-
-            qcol1, qcol2, qcol3 = st.columns(3)
+        
+        # Display contracted Role 3 WT benchmark metrics if present
+        if not df_quant.empty and "casci_energy_hartree" in df_quant.columns:
+            wt_row = df_quant.iloc[0]
+            qcol1, qcol2, qcol3, qcol4 = st.columns(4)
             with qcol1:
-                st.metric("Active Space", "(4e, 4o) Jordan-Wigner")
+                st.metric("Ansatz / Mapper", f"{wt_row.get('ansatz', 'UCCSD')} ({wt_row.get('qubit_mapper', 'Jordan-Wigner')})")
             with qcol2:
-                st.metric("Qubits / Depth", "8 Qubits / Depth 24")
+                st.metric("Qubits / Parameters", f"{wt_row.get('num_qubits', 8)} Qubits / {wt_row.get('ansatz_parameters', 26)} params")
             with qcol3:
-                max_err = noiseless["energy_error_kcal_mol"].max()
-                st.metric("Max Noiseless VQE Error", f"{max_err:.3f} kcal/mol", "Chemical Accuracy (<1.6)")
+                st.metric("Transpiled Depth", f"Depth {wt_row.get('transpiled_circuit_depth', 667)} ({wt_row.get('two_qubit_gate_count', 265)} CX)")
+            with qcol4:
+                vqe_err = abs(wt_row.get('absolute_vqe_error_hartree', 0.0)) * 627.509
+                st.metric("VQE Energy Error", f"{vqe_err:.4f} kcal/mol", "Chemical Accuracy (<1.6)")
+
+            st.dataframe(df_quant, width="stretch")
+
+        df_parity = df_quant if ("noise_level" in df_quant.columns) else pipeline_data.get("quantum_sim", pd.DataFrame())
+        if not df_parity.empty and "noise_level" in df_parity.columns:
+            noiseless = df_parity[df_parity["noise_level"] == 0.0]
+
+            if "casci_energy_hartree" not in df_quant.columns:
+                qcol1, qcol2, qcol3 = st.columns(3)
+                with qcol1:
+                    st.metric("Active Space", "(4e, 4o) Jordan-Wigner")
+                with qcol2:
+                    st.metric("Qubits / Depth", "8 Qubits / Depth 24")
+                with qcol3:
+                    max_err = noiseless["energy_error_kcal_mol"].max()
+                    st.metric("Max Noiseless VQE Error", f"{max_err:.3f} kcal/mol", "Chemical Accuracy (<1.6)")
 
             # Parity plot CASCI vs VQE
             fig_q = px.scatter(
-                df_quant,
+                df_parity,
                 x="e_casci_hartree",
                 y="e_vqe_hartree",
                 color="noise_model",
