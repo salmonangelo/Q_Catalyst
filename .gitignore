@@ -63,3 +63,5 @@ results/embeddings/
 # Scratch files
 scratch/
 .system_generated/
+
+uv.lock

@@ -11,7 +11,12 @@ import re
 from functools import lru_cache
 from typing import Any
 
-from Bio import Align
+try:
+    from Bio import Align
+    _HAS_BIO = True
+except ImportError:
+    Align = None
+    _HAS_BIO = False
 
 MUTATION_TOKEN_RE = re.compile(r"^([A-Za-z*])(\d+)([A-Za-z*])$")
 
@@ -180,8 +185,13 @@ def apply_mutations(
 
 
 @lru_cache(maxsize=16)
-def get_pairwise_aligner() -> Align.PairwiseAligner:
+def get_pairwise_aligner() -> Any:
     """Return configured global pairwise sequence aligner."""
+    if not _HAS_BIO or Align is None:
+        raise ImportError(
+            "biopython is required for sequence alignment. "
+            "Please ensure 'biopython' is installed in your environment."
+        )
     aligner = Align.PairwiseAligner()
     aligner.mode = "global"
     aligner.match_score = 2
