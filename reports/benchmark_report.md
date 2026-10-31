@@ -1,5 +1,7 @@
 # Q-Catalyst Role 1 Benchmarking Report
 
+> **Artifact freshness warning:** This report is a prior-run snapshot. The feature branch corrects the A0 random-ranking implementation and changes A2 to use the saved supervised XGBoost predictions rather than the uncertainty ensemble mean. Regenerate this report by running `python scripts/run_role1_pipeline.py --target activity` before quoting benchmark values as outputs of the updated branch.
+
 ## Executive Summary
 - **Parent Enzyme:** `IsPETase`
 - **Target Target:** `activity`

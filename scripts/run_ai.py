@@ -71,7 +71,7 @@ def run_esm_scoring(
     output_path: Path,
     enzyme: str | None = None,
     max_variants: int = 20,
-    mock: bool = True,
+    mock: bool = False,
     cache_dir: Path | None = None,
 ) -> int:
     """Score a selected subset of variants using ESM-1v."""
@@ -83,7 +83,7 @@ def run_esm_scoring(
     print(f"Output predictions:   {output_path.resolve()}")
     print(f"Max variants to score: {max_variants} (home session compute limit)")
     print(f"Execution mode:        {'Mock (calibrated LLR proxy)' if mock else 'Real weights'}")
-    print("Network access:        None (zero downloads)")
+    print("Network access:        Cached model weights required; no silent mock fallback")
     print("-" * 70)
 
     if not input_path.exists():
@@ -145,7 +145,7 @@ def run_embedding_extraction(
     pooling: str = "mean",
     enzyme: str | None = None,
     max_variants: int = 20,
-    mock: bool = True,
+    mock: bool = False,
 ) -> int:
     """Extract ESM-2 sequence representations for a small batch of variants."""
     start_time = time.time()
@@ -218,7 +218,7 @@ def run_supervised_training(
     target_name: str = "activity",
     enzyme: str = "IsPETase",
     random_seed: int = 42,
-    mock_embeddings: bool = True,
+    mock_embeddings: bool = False,
     split_version: str = "v2",
 ) -> int:
     """Train XGBoost model and Ridge comparison baseline and evaluate on held-out split."""
@@ -395,7 +395,7 @@ def run_uncertainty_estimation(
     random_seed: int = 42,
     n_ensemble: int = 10,
     alpha: float = 0.10,
-    mock_embeddings: bool = True,
+    mock_embeddings: bool = False,
     split_version: str = "v2",
 ) -> int:
     """Execute Feature 6 uncertainty estimation pipeline with split-conformal calibration."""
@@ -465,7 +465,11 @@ def run_uncertainty_estimation(
     pred_cal_mean, _, _ = ensemble.predict(X_cal)
     calibrator = SplitConformalCalibrator(alpha=alpha)
     calibrator.calibrate(y_cal, pred_cal_mean)
-    print(f"  Conformal quantile threshold q = {calibrator.threshold_q:.4f}")
+    print(
+        "  Conformal quantile threshold q = "
+        f"{calibrator.threshold_q:.4f}" if calibrator.threshold_q is not None
+        else "  Conformal quantile threshold q = N/A (insufficient calibration data)"
+    )
 
     # 5. Fit OOD detector on X_fit
     ood_detector = OODDetector()
@@ -562,7 +566,7 @@ def run_uncertainty_estimation(
         f"- **Ensemble Architecture:** {n_ensemble} bootstrap XGBoost predictors",
         f"- **Calibration Scheme:** Split-conformal regression on independent single-site holdout (N={len(cal_df)})",
         f"- **Target Coverage:** {int((1.0 - alpha) * 100)}% (alpha = {alpha})",
-        f"- **Conformal Quantile Threshold ($q$):** {calibrator.threshold_q:.4f}",
+        f"- **Conformal Quantile Threshold ($q$):** {calibrator.threshold_q:.4f}" if calibrator.threshold_q is not None else "- **Conformal Quantile Threshold ($q$):** N/A (insufficient calibration data)",
         f"- **Held-Out Empirical Coverage:** **{test_coverage_val * 100:.1f}%**",
         "",
         "## 2. Uncertainty Signals Summary (Held-Out Test Set)",
@@ -690,7 +694,13 @@ def run_gate0_validation(
     print(f"Evaluated Held-Out Variants: {result.n_held_out}")
     print(f"Spearman rho:                {result.spearman_rho:.4f} (p = {result.spearman_pvalue:.2e})")
     print(f"Bootstrap 95% CI:            [{result.ci_lower:.4f}, {result.ci_upper:.4f}]")
-    print(f"CI Includes Zero:            {'YES (Failed planned criterion)' if result.ci_includes_zero else 'NO (Statistically robust correlation)'}")
+    if result.ci_includes_zero:
+        ci_interpretation = "YES (inconclusive; Gate 0 fails)"
+    elif result.ci_upper < 0.0:
+        ci_interpretation = "NO (inverse association; Gate 0 fails)"
+    else:
+        ci_interpretation = "NO (positive interval; Gate 0 passes)"
+    print(f"CI Spans Zero:               {ci_interpretation}")
     auc_display = f"{result.auroc:.4f}" if result.auroc is not None else "Undefined"
     print(f"Worst Quartile AUROC:        {auc_display} ({result.auroc_status})")
     print("-" * 70)
@@ -715,7 +725,7 @@ def run_benchmarking(
     good_threshold: float = 1.0,
     random_seed: int = 42,
     n_bootstrap: int = 1000,
-    mock_esm: bool = True,
+    mock_esm: bool = False,
 ) -> int:
     """Run Feature 8 benchmarking suite across arms A0, A1, A2 on held-out split."""
     start_time = time.time()
@@ -855,9 +865,14 @@ def main() -> None:
         help="Max sequences to score or embed (default: 20)",
     )
     parser.add_argument(
+        "--mock",
+        action="store_true",
+        help="Explicitly opt into synthetic proxy outputs for offline smoke tests only; never for scientific benchmarks.",
+    )
+    parser.add_argument(
         "--use-cached-model",
         action="store_true",
-        help="Attempt to load real weights from cache_dir instead of mock proxy",
+        help="Deprecated compatibility flag: real pretrained weights are now the default. Use --mock only for offline tests.",
     )
     parser.add_argument(
         "--split-version",
@@ -868,7 +883,10 @@ def main() -> None:
     )
 
     args = parser.parse_args()
-    mock = not args.use_cached_model
+    if args.mock and args.use_cached_model:
+        parser.error("--mock and --use-cached-model are contradictory; omit --use-cached-model when opting into mocks.")
+    # Production-real weights are the CLI default. Mock behavior requires explicit opt-in.
+    mock = bool(args.mock)
 
     if args.run_benchmarks:
         code = run_benchmarking(

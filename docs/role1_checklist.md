@@ -12,16 +12,31 @@
 |---|---|---|---|---|---|---|
 | **D1** | **Raw Data Audit & Licensing** | `src/qcatalyst/data/audit.py`, `scripts/prepare_data.py` | `tests/test_data_audit.py` | `reports/data_audit_summary.md`, `reports/tables/petgym_file_manifest.csv` | Verify file existence, SHA-256 hashes, licenses, non-comparability of unpooled assay units | **Completed** |
 | **D2** | **Mutation Parsing & Canonical Curation** | `src/qcatalyst/data/curation.py`, `mutation.py` | `tests/test_mutation.py`, `tests/test_data_contracts.py` | `data/curated/variants.parquet`, `reports/data_quality_report.md` | Standardize sequence representations; map parent mutations to mature 5XJH crystal numbering; flag duplicates/outliers | **Completed** |
-| **D3** | **Pretrained ESM-1v Zero-Shot Scoring** | `src/qcatalyst/protein_ai/esm_scoring.py`, `scripts/run_ai.py` | `tests/test_protein_ai.py`, `scratch/step2_esm1v_smoke_test.py` | `results/predictions/esm1v_scores.parquet`, `results/predictions/real_esm1v/` | Official masked-marginal $\Delta\text{LLR}$ scoring using genuine `facebook/esm1v_t33_650M_UR90S_1` checkpoint; 1-based indexing; deterministic eval | **In Progress (Weights Approved)** |
+| **D3** | **Pretrained ESM-1v Zero-Shot Scoring** | `src/qcatalyst/protein_ai/esm_scoring.py`, `scripts/run_ai.py` | `tests/test_protein_ai.py`, `scratch/step2_esm1v_smoke_test.py` | `results/predictions/esm1v_scores.parquet`, `results/predictions/real_esm1v/` | Official masked-marginal $\Delta\text{LLR}$ scoring using genuine `facebook/esm1v_t33_650M_UR90S_1` checkpoint; 1-based indexing; deterministic eval | **Implemented; fresh integrated run pending** |
 | **D4** | **Pretrained ESM-2 Sequence Embeddings** | `src/qcatalyst/protein_ai/embeddings.py` | `tests/test_embeddings.py`, `tests/test_embeddings_real.py` | `results/embeddings/real_facebook_esm2_t12_35M_UR50D/`, `embedding_index.parquet` | Genuine 480-d sequence embeddings from `facebook/esm2_t12_35M_UR50D`; attention-masked residue-only mean pooling; SHA-256 cache | **Completed** |
-| **D5** | **Supervised Predictors (XGBoost & Ridge)** | `src/qcatalyst/protein_ai/predictor.py` | `tests/test_predictor.py` | `results/models/`, `results/predictions/predictions.parquet`, `reports/supervised_prediction_report.md` | Train XGBoost & Ridge on real ESM-2 embeddings against genuine experimental labels; evaluate on leakage-free single-to-multi split ($N=65$) | **Partially Completed (Requires Retraining on Leakage-Free Split)** |
-| **D6** | **Uncertainty Quantification & Conformalization** | `src/qcatalyst/uncertainty/estimate.py`, `calibrate.py` | `tests/test_uncertainty.py` | `results/uncertainty/uncertainty.parquet`, `reports/uncertainty_report.md` | 10-member bootstrap ensemble std, 90% split-conformal intervals, normalized ESM-2 OOD distance, 5XJH catalytic triad structural risk, composite $U(x)$ | **Partially Completed (Requires Evaluation on Leakage-Free Split)** |
+| **D5** | **Supervised Predictors (XGBoost & Ridge)** | `src/qcatalyst/protein_ai/predictor.py` | `tests/test_predictor.py` | `results/models/`, `results/predictions/predictions.parquet`, `reports/supervised_prediction_report.md` | Train XGBoost & Ridge on real ESM-2 embeddings against genuine experimental labels; evaluate on leakage-free single-to-multi split ($N=65$) | **Implemented; fresh integrated run pending** |
+| **D6** | **Uncertainty Quantification & Conformalization** | `src/qcatalyst/uncertainty/estimate.py`, `calibrate.py` | `tests/test_uncertainty.py` | `results/uncertainty/uncertainty.parquet`, `reports/uncertainty_report.md` | 10-member bootstrap ensemble std, 90% split-conformal intervals, normalized ESM-2 OOD distance, 5XJH catalytic triad structural risk, composite $U(x)$ | **Implemented; fresh integrated run pending** |
 | **D7** | **Gate 0 Uncertainty Validation** | `src/qcatalyst/uncertainty/gate.py` | `tests/test_gate0.py` | `reports/tables/gate0_verdict.json`, `reports/figures/gate0_coverage_plot.png`, `reports/gate0_validation_report.md` | Spearman correlation $\rho(U(x), \|y - \hat{y}\|) > 0$ with 95% bootstrap CI; empirical coverage $\ge 85\%$ on genuine held-out evaluation variants | **Partially Completed (Requires Evaluation on Leakage-Free Split)** |
-| **D8** | **Benchmarking Suite (Arms A0–A2)** | `src/qcatalyst/evaluation/benchmarks.py` | `tests/test_benchmarks.py` | `results/benchmarks/benchmark_results.parquet`, `reports/benchmark_report.md` | Standardized metrics (P@5/10/20, EF@10, NDCG@10, Spearman $\rho$, Kendall $\tau$) with 1000 bootstrap CIs comparing A0 (Random), A1 (ESM-1v), A2 (XGBoost) | **Partially Completed (Requires Real ESM-1v & Leakage-Free Split)** |
+| **D8** | **Benchmarking Suite (Arms A0–A2)** | `src/qcatalyst/evaluation/benchmarks.py` | `tests/test_benchmarks.py` | `results/benchmarks/benchmark_results.parquet`, `reports/benchmark_report.md` | Standardized metrics (P@5/10/20, EF@10, NDCG@10, Spearman $\rho$, Kendall $\tau$) with 1000 bootstrap CIs comparing A0 (Random), A1 (ESM-1v), A2 (XGBoost) | **Implemented; fresh integrated run pending** |
 
 ---
 
-## 2. Key Verification Rules & Guardrails
+
+## 2. End-to-End Integration Status
+
+The feature branch `feature/role1-end-to-end-pipeline` adds an end-to-end runner at `scripts/run_role1_pipeline.py`, a reproducible runbook at `docs/role1_pipeline_runbook.md`, a fail-safe Gate 0 policy bridge at `src/qcatalyst/acquisition/gate.py`, and a candidate-level joined artifact at `results/rankings/role1_candidate_gate.parquet`.
+
+**Verification status:** Code and regression tests have been added on the feature branch, but the full branch has not yet been executed in the target Windows environment after these integration changes. Do not change the status to `Verified` until the real-weight runner completes and the fresh test output plus `reports/role1_pipeline_run.json` are reviewed.
+
+Required acceptance evidence for each fresh run:
+- Actual ESM-1v score table with real model provenance and only successful finite scores.
+- Actual ESM-2 embedding index with `real_esm2_35M` provenance, unique IDs, finite 480-dimensional embeddings.
+- Frozen v2 train/evaluation manifests matching the current labeled data with zero ID and sequence overlap.
+- Supervised model metrics, uncertainty intervals, Gate 0 verdict, and A0-A2 benchmark outputs generated by the same run.
+- Candidate gate artifact with one row per v2 held-out candidate and a policy consistent with the Gate 0 verdict.
+- Test output and run manifest tied to the checked-out Git commit.
+
+## 3. Key Verification Rules & Guardrails
 1. **Model Weight Separation:** ESM-2 35M embeddings (D4) and ESM-1v zero-shot mutation scores (D3) must remain strictly segregated in code and disk artifacts.
 2. **Leakage-Free Partition:** Single-to-multi evaluation task must strictly segregate single-site training mutants ($N=84$) from multi-site evaluation mutants ($N=65$) with exactly zero ID or sequence overlap.
 3. **No Synthetic Fallback Masking:** Offline unit tests use an explicit `mock=True` parameter with calibrated BLOSUM62 proxy; production runs with `mock=False` must use real model weights and never label synthetic values as genuine.

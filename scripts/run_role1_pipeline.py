@@ -22,10 +22,12 @@ for entry in (REPO_ROOT, SRC_DIR):
     if str(entry) not in sys.path:
         sys.path.insert(0, str(entry))
 
+import numpy as np
 import pandas as pd
 
 from scripts import run_ai
 from scripts.select_candidates import build_role1_candidate_gate
+from qcatalyst.protein_ai.predictor import create_frozen_split
 
 
 def get_git_revision() -> str | None:
@@ -90,6 +92,13 @@ def main() -> int:
     enzyme_df = df[df["parent_enzyme"].astype(str).str.lower() == args.enzyme.lower()]
     if enzyme_df.empty:
         parser.error(f"No records found for parent enzyme {args.enzyme!r}.")
+    unique_pool_size = int(enzyme_df["variant_id"].nunique())
+    if args.max_variants < unique_pool_size:
+        parser.error(
+            f"Complete pipeline requires all {unique_pool_size} unique {args.enzyme} variants, "
+            f"but --max-variants={args.max_variants}. Use scripts/run_ai.py --mock for a smoke test "
+            "or omit --max-variants to run the complete scientific pipeline."
+        )
 
     run_started = datetime.now(timezone.utc).isoformat()
     stage_records: list[dict] = []
@@ -111,6 +120,95 @@ def main() -> int:
     print("Policy: no mock fallback; missing checkpoints or artifacts fail the run.")
     print(f"Input rows for enzyme: {len(enzyme_df)}")
     print(f"Unique variant IDs: {enzyme_df['variant_id'].nunique()}")
+
+    # Audit the data splits before loading either large model. Existing v2 manifests
+    # are treated as frozen contracts; a changed dataset must be re-versioned deliberately.
+    for target in target_names:
+        target_col = "activity_raw" if target == "activity" else "tm_raw"
+        eligible = enzyme_df[
+            enzyme_df[target_col].notna()
+            & (~enzyme_df["is_duplicate"].fillna(False).astype(bool))
+        ].copy()
+        train_df, heldout_df, generated_manifest = create_frozen_split(
+            eligible, split_strategy="single_to_multi", random_seed=42, version="v2"
+        )
+        train_ids = set(train_df["variant_id"].astype(str))
+        heldout_ids = set(heldout_df["variant_id"].astype(str))
+        train_sequences = set(train_df["mutant_sequence"].dropna().astype(str))
+        heldout_sequences = set(heldout_df["mutant_sequence"].dropna().astype(str))
+        if not train_ids or not heldout_ids:
+            raise RuntimeError(f"{target} split is empty after label and quality filtering.")
+        if train_ids.intersection(heldout_ids) or train_sequences.intersection(heldout_sequences):
+            raise RuntimeError(f"{target} v2 split failed ID/sequence disjointness checks.")
+        manifest_path = REPO_ROOT / "data" / "splits" / f"{args.enzyme.lower()}_{target}_single_to_multi_v2.json"
+        if manifest_path.exists():
+            frozen = json.loads(manifest_path.read_text(encoding="utf-8"))
+            frozen_train = set(map(str, frozen.get("train_variant_ids", [])))
+            frozen_eval = set(map(str, frozen.get("eval_variant_ids", [])))
+            if frozen_train != train_ids or frozen_eval != heldout_ids:
+                raise RuntimeError(
+                    f"Frozen {target} v2 split differs from current eligible data. "
+                    "Do not overwrite it silently; review the split audit and create a new version."
+                )
+        if args.enzyme.lower() == "ispetase" and target == "activity":
+            if len(train_df) != 84 or len(heldout_df) != 65:
+                raise RuntimeError(
+                    f"Expected IsPETase activity split v2 N_train=84 and N_eval=65; "
+                    f"observed {len(train_df)} / {len(heldout_df)}."
+                )
+        print(
+            f"Split preflight ({target}): train={len(train_df)}, held-out={len(heldout_df)}, "
+            f"ID overlap=0, sequence overlap=0, frozen_manifest="
+            f"{'matched' if manifest_path.exists() else 'not yet present'}"
+        )
+
+    def verify_real_model_outputs() -> int:
+        scored = pd.read_parquet(esm1v_scores)
+        if scored.empty or "run_status" not in scored.columns:
+            raise RuntimeError("ESM-1v output is empty or missing run_status.")
+        if not (scored["run_status"].astype(str).str.lower() == "success").all():
+            raise RuntimeError("ESM-1v output contains failed or mocked rows.")
+        if "feature_source" in scored.columns and not (
+            scored["feature_source"].astype(str) == "esm1v_zero_shot_llr"
+        ).all():
+            raise RuntimeError("ESM-1v output feature_source does not identify genuine zero-shot LLR scores.")
+        if "model_name" not in scored.columns or not (
+            scored["model_name"].astype(str) == "facebook/esm1v_t33_650M_UR90S_1"
+        ).all():
+            raise RuntimeError("ESM-1v output lacks or contains an unexpected model identifier.")
+        if scored["variant_id"].astype(str).duplicated().any():
+            raise RuntimeError("ESM-1v score table contains duplicate variant IDs.")
+        expected_ids = set(enzyme_df["variant_id"].astype(str))
+        scored_ids = set(scored["variant_id"].astype(str))
+        if scored_ids != expected_ids:
+            raise RuntimeError(
+                f"ESM-1v output does not cover the complete variant pool: "
+                f"missing={sorted(expected_ids - scored_ids)[:5]}, "
+                f"unexpected={sorted(scored_ids - expected_ids)[:5]}"
+            )
+        if not np.isfinite(scored["score"].to_numpy(dtype=float)).all():
+            raise RuntimeError("ESM-1v score table contains non-finite scores.")
+        embedding_index = pd.read_parquet(esm2_output / "embedding_index.parquet")
+        if embedding_index.empty:
+            raise RuntimeError("ESM-2 embedding index is empty.")
+        if "feature_source" in embedding_index.columns and not (
+            embedding_index["feature_source"].astype(str) == "real_esm2_35M"
+        ).all():
+            raise RuntimeError("ESM-2 embedding index contains mocked/synthetic vectors.")
+        if "dimensions" in embedding_index.columns and not (
+            embedding_index["dimensions"].astype(int) == 480
+        ).all():
+            raise RuntimeError("ESM-2 embedding index contains unexpected vector dimensions.")
+        if not embedding_index["variant_id"].astype(str).is_unique:
+            raise RuntimeError("ESM-2 embedding index has duplicate variant IDs.")
+        embedded_ids = set(embedding_index["variant_id"].astype(str))
+        if embedded_ids != expected_ids:
+            raise RuntimeError(
+                f"ESM-2 embedding index does not cover the complete variant pool: "
+                f"missing={sorted(expected_ids - embedded_ids)[:5]}, "
+                f"unexpected={sorted(embedded_ids - expected_ids)[:5]}"
+            )
+        return 0
 
     try:
         run_stage(
@@ -135,6 +233,7 @@ def main() -> int:
             ),
             stage_records,
         )
+        run_stage("Verify genuine ESM-1v and ESM-2 provenance", verify_real_model_outputs, stage_records)
 
         for target in target_names:
             run_stage(
@@ -195,22 +294,25 @@ def main() -> int:
                     ),
                     stage_records,
                 )
+            def build_candidate_gate_stage() -> int:
+                build_role1_candidate_gate(
+                    variants_path=args.input,
+                    predictions_path=predictions,
+                    uncertainty_path=uncertainty_activity,
+                    esm1v_scores_path=esm1v_scores,
+                    embedding_index_path=esm2_output / "embedding_index.parquet",
+                    gate0_verdict_path=REPO_ROOT / "reports" / "tables" / "gate0_verdict.json",
+                    split_manifest_path=REPO_ROOT / "data" / "splits" / f"{args.enzyme.lower()}_activity_single_to_multi_v2.json",
+                    output_path=results / "rankings" / "role1_candidate_gate.parquet",
+                    decision_path=results / "rankings" / "role1_candidate_gate.json",
+                    enzyme=args.enzyme,
+                    target_name="activity",
+                )
+                return 0
+
             run_stage(
                 "Integrated Gate 0 candidate-gate artifact",
-                lambda: (
-                    build_role1_candidate_gate(
-                        variants_path=args.input,
-                        predictions_path=predictions,
-                        uncertainty_path=uncertainty_activity,
-                        esm1v_scores_path=esm1v_scores,
-                        gate0_verdict_path=REPO_ROOT / "reports" / "tables" / "gate0_verdict.json",
-                        split_manifest_path=REPO_ROOT / "data" / "splits" / f"{args.enzyme.lower()}_activity_single_to_multi_v2.json",
-                        output_path=results / "rankings" / "role1_candidate_gate.parquet",
-                        decision_path=results / "rankings" / "role1_candidate_gate.json",
-                        enzyme=args.enzyme,
-                        target_name="activity",
-                    ) and 0
-                ),
+                build_candidate_gate_stage,
                 stage_records,
             )
 

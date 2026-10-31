@@ -1,29 +1,40 @@
 # Q-Catalyst Protein AI Model Configuration
+# The active Role 1 implementation uses one ESM-1v checkpoint and ESM-2 35M.
+# Other ESM-1v ensemble members / larger ESM-2 models are not loaded by default.
 
 esm1v:
   model_name: "facebook/esm1v_t33_650M_UR90S_1"
   model_version: "v1"
   scoring_strategy: "masked_marginal"
+  active_checkpoint_count: 1
   ensemble_members:
     - "facebook/esm1v_t33_650M_UR90S_1"
-    - "facebook/esm1v_t33_650M_UR90S_2"
-    - "facebook/esm1v_t33_650M_UR90S_3"
-    - "facebook/esm1v_t33_650M_UR90S_4"
-    - "facebook/esm1v_t33_650M_UR90S_5"
-  cache_dir: "env/cache/models/esm1v"
+  cache_dir: null # Use the default Hugging Face cache location from the environment.
   device: "cpu"
   batch_size: 1
   max_sequence_length: 1024
-  allow_downloads_at_home: false
-  mock_fallback: true
+  allow_automatic_downloads: false
+  mock_fallback: false
+  production_api_default: "real_weights; pass mock=True explicitly for offline tests"
 
 esm2:
-  embedding_model: "facebook/esm2_t6_8M_UR50D" # Lightweight test model (8M params)
-  production_model: "facebook/esm2_t33_650M_UR50D"
-  cache_dir: "env/cache/models/esm2"
+  embedding_model: "facebook/esm2_t12_35M_UR50D"
+  embedding_dimensions: 480
   pooling: "mean"
+  pooling_mask: "residue_tokens_only"
+  cache_dir: "results/embeddings"
+  device: "cpu"
+  mock_fallback: false
+  mock_mode_requires_explicit_opt_in: true
 
 supervised:
   preferred_model: "xgboost"
   comparison_baseline: "ridge"
   random_seed: 42
+  evaluation_split: "single_to_multi_v2"
+
+uncertainty:
+  ensemble_members: 10
+  conformal_target_coverage: 0.90
+  gate0_positive_ci_lower_required: true
+  gate0_fail_action: "FALLBACK_TO_DIVERSITY_SELECTION"
