@@ -46,7 +46,10 @@ def fuse_evidence_and_rank(
     quantum_dict = {}
     if df_quantum is not None and not df_quantum.empty:
         # Take noiseless run
-        noiseless = df_quantum[df_quantum["noise_level"] == 0.0]
+        if "noise_level" in df_quantum.columns:
+            noiseless = df_quantum[df_quantum["noise_level"] == 0.0]
+        else:
+            noiseless = df_quantum
         for _, row in noiseless.iterrows():
             quantum_dict[row["variant_id"]] = row.to_dict()
 
