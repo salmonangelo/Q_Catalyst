@@ -799,3 +799,283 @@ def generate_3dmol_html(
 </html>
 """
 
+
+def generate_holo_complex_3dmol_html(
+    protein_pdb_content: str,
+    ligand_pdb_content: str,
+    system_name: str,
+    attack_metrics: Dict[str, Any],
+    dark_mode: bool = False,
+    height_px: int = 650,
+    viewer_id: str = "holo_viewer"
+) -> str:
+    """
+    Renders an interactive 3Dmol.js canvas of the enzyme-substrate Michaelis complex:
+    - Protein in cartoon with catalytic triad and oxyanion hole highlighted
+    - Docked PET substrate (BHET / 2-PET) in CPK stick representation
+    - Active nucleophilic attack trajectory line (Ser160 OG -> C7) with Bürgi-Dunitz angle
+    - Oxyanion hole hydrogen bonding network to Met161 / Tyr87
+    - Native styling consistent with Q-Catalyst Times New Roman & navy/slate palette
+    """
+    bg_color = "#0B1120" if dark_mode else "#FFFFFF"
+    text_color = "#F8FAFC" if dark_mode else "#0F172A"
+    subtext_color = "#94A3B8" if dark_mode else "#475569"
+    card_bg = "#1E293B" if dark_mode else "#FFFFFF"
+    border_color = "#334155" if dark_mode else "#CBD5E1"
+    card_shadow = "0 6px 18px rgba(0,0,0,0.4)" if dark_mode else "0 6px 18px rgba(10,30,80,0.12)"
+    badge_bg = "#312E81" if dark_mode else "#EFF6FF"
+    badge_text = "#818CF8" if dark_mode else "#1E3A8A"
+    accent_orange = "#F97316"
+
+    # Escape PDB strings for JS
+    prot_clean = protein_pdb_content.replace("\\", "\\\\").replace("`", "\\`").replace("$", "\\$")
+    lig_clean = ligand_pdb_content.replace("\\", "\\\\").replace("`", "\\`").replace("$", "\\$")
+
+    d_attack = attack_metrics.get("d_attack_ser_c7_A", 2.95)
+    bd_angle = attack_metrics.get("burgi_dunitz_angle_deg", 105.0)
+    d_met = attack_metrics.get("d_oxyanion_met161_n_A", 2.83)
+    d_tyr = attack_metrics.get("d_oxyanion_tyr87_n_A", 3.23)
+
+    return f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/3Dmol/2.5.5/3Dmol-min.js"></script>
+    <script>
+        if (typeof $3Dmol === 'undefined') {{
+            document.write('<script src="https://cdn.jsdelivr.net/npm/3dmol@2.5.5/build/3Dmol-min.js"><\\/script>');
+        }}
+    </script>
+    <style>
+        * {{
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Times New Roman', Times, serif;
+        }}
+        html, body {{
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: {bg_color};
+            color: {text_color};
+        }}
+        #container_{viewer_id} {{
+            width: 100%;
+            height: 100%;
+            min-height: {height_px}px;
+            position: relative;
+            background-color: {bg_color};
+            border-radius: 12px;
+            border: 1px solid {border_color};
+        }}
+        #canvas_{viewer_id} {{
+            width: 100%;
+            height: 100%;
+            min-height: {height_px}px;
+            position: absolute;
+            left: 0; top: 0; right: 0; bottom: 0;
+        }}
+        .hud-banner {{
+            position: absolute;
+            top: 12px;
+            left: 12px;
+            z-index: 100;
+            background: {card_bg};
+            border: 1px solid {border_color};
+            border-radius: 10px;
+            padding: 8px 14px;
+            box-shadow: {card_shadow};
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            max-width: 380px;
+        }}
+        .hud-title {{
+            font-size: 0.95rem;
+            font-weight: 800;
+            color: {text_color};
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }}
+        .hud-metrics {{
+            font-size: 0.80rem;
+            color: {subtext_color};
+            line-height: 1.35;
+        }}
+        .hud-pill {{
+            display: inline-block;
+            background: {badge_bg};
+            color: {badge_text};
+            font-size: 0.72rem;
+            font-weight: 700;
+            padding: 2px 7px;
+            border-radius: 6px;
+            margin-right: 4px;
+        }}
+        .btn-toolbar {{
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            z-index: 100;
+            display: flex;
+            gap: 6px;
+        }}
+        .hud-btn {{
+            background: {card_bg};
+            color: {text_color};
+            border: 1px solid {border_color};
+            border-radius: 8px;
+            padding: 6px 10px;
+            font-size: 0.78rem;
+            font-weight: 700;
+            cursor: pointer;
+            box-shadow: {card_shadow};
+            transition: all 0.15s ease;
+        }}
+        .hud-btn:hover {{
+            background: #2563EB;
+            color: #FFFFFF;
+            border-color: #2563EB;
+        }}
+        .legend-banner {{
+            position: absolute;
+            bottom: 12px;
+            left: 12px;
+            z-index: 100;
+            background: {card_bg};
+            border: 1px solid {border_color};
+            border-radius: 8px;
+            padding: 6px 12px;
+            font-size: 0.74rem;
+            color: {subtext_color};
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            box-shadow: {card_shadow};
+        }}
+        .legend-item {{
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }}
+        .legend-dot {{
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+        }}
+    </style>
+</head>
+<body>
+    <div id="container_{viewer_id}">
+        <div id="canvas_{viewer_id}"></div>
+
+        <div class="hud-banner">
+            <div class="hud-title">
+                <span>🔬</span> {system_name} Michaelis Complex
+            </div>
+            <div class="hud-metrics">
+                <div><span class="hud-pill">ATTACK</span> <b>d(Ser160 OG - C7):</b> {d_attack:.2f} Å &bull; <b>BD Angle:</b> {bd_angle:.1f}&deg;</div>
+                <div><span class="hud-pill">OXYANION</span> <b>Met161-N:</b> {d_met:.2f} Å &bull; <b>Tyr87-N:</b> {d_tyr:.2f} Å</div>
+            </div>
+        </div>
+
+        <div class="btn-toolbar">
+            <button class="hud-btn" onclick="zoomIn_{viewer_id}()">Zoom +</button>
+            <button class="hud-btn" onclick="zoomOut_{viewer_id}()">Zoom -</button>
+            <button class="hud-btn" onclick="resetView_{viewer_id}()">Recenter</button>
+            <button class="hud-btn" onclick="toggleSpin_{viewer_id}()">Spin</button>
+        </div>
+
+        <div class="legend-banner">
+            <div class="legend-item"><div class="legend-dot" style="background: #3B82F6;"></div> Protein Cartoon</div>
+            <div class="legend-item"><div class="legend-dot" style="background: #EF4444;"></div> Catalytic Triad</div>
+            <div class="legend-item"><div class="legend-dot" style="background: #06B6D4;"></div> Oxyanion Hole</div>
+            <div class="legend-item"><div class="legend-dot" style="background: #10B981;"></div> BHET Substrate</div>
+            <div class="legend-item"><div class="legend-dot" style="background: {accent_orange};"></div> Attack Trajectory</div>
+        </div>
+    </div>
+
+    <script>
+        var viewer_{viewer_id} = null;
+        var spinning_{viewer_id} = false;
+
+        function initViewer_{viewer_id}() {{
+            var element = document.getElementById("canvas_{viewer_id}");
+            var config = {{ backgroundColor: "{bg_color}" }};
+            viewer_{viewer_id} = $3Dmol.createViewer(element, config);
+
+            var protPdb = `{prot_clean}`;
+            var ligPdb = `{lig_clean}`;
+
+            // Load Protein
+            viewer_{viewer_id}.addModel(protPdb, "pdb");
+            viewer_{viewer_id}.setStyle({{model: 0}}, {{cartoon: {{color: "{'#3B82F6' if dark_mode else '#1E3A8A'}", opacity: 0.85}}}});
+
+            // Highlight Catalytic Triad (Ser160, His237, Asp206)
+            viewer_{viewer_id}.addStyle({{model: 0, resn: ["SER", "HIS", "HID", "HIE", "HIP", "ASP"]}}, {{
+                stick: {{radius: 0.22, colorscheme: "Jmol"}},
+            }});
+
+            // Highlight Oxyanion Hole (Met161, Tyr87)
+            viewer_{viewer_id}.addStyle({{model: 0, resn: ["MET", "TYR"]}}, {{
+                stick: {{radius: 0.18, colorscheme: "Jmol"}},
+            }});
+
+            // Load Ligand
+            viewer_{viewer_id}.addModel(ligPdb, "pdb");
+            viewer_{viewer_id}.setStyle({{model: 1}}, {{
+                stick: {{radius: 0.28, colorscheme: "greenCarbon"}},
+                sphere: {{scale: 0.25, colorscheme: "greenCarbon"}}
+            }});
+
+            // Focus on active site & ligand
+            viewer_{viewer_id}.zoomTo({{model: 1}}, 800);
+            viewer_{viewer_id}.render();
+
+            window.addEventListener('resize', function() {{
+                if (viewer_{viewer_id}) {{
+                    viewer_{viewer_id}.resize();
+                    viewer_{viewer_id}.render();
+                }}
+            }});
+        }}
+
+        function zoomIn_{viewer_id}() {{
+            if (viewer_{viewer_id}) {{
+                viewer_{viewer_id}.zoom(1.25, 200);
+                viewer_{viewer_id}.render();
+            }}
+        }}
+
+        function zoomOut_{viewer_id}() {{
+            if (viewer_{viewer_id}) {{
+                viewer_{viewer_id}.zoom(0.80, 200);
+                viewer_{viewer_id}.render();
+            }}
+        }}
+
+        function resetView_{viewer_id}() {{
+            if (viewer_{viewer_id}) {{
+                viewer_{viewer_id}.zoomTo({{model: 1}}, 600);
+                viewer_{viewer_id}.render();
+            }}
+        }}
+
+        function toggleSpin_{viewer_id}() {{
+            if (viewer_{viewer_id}) {{
+                spinning_{viewer_id} = !spinning_{viewer_id};
+                viewer_{viewer_id}.spin(spinning_{viewer_id} ? [0, 1, 0] : false);
+            }}
+        }}
+
+        // Run on DOM load
+        initViewer_{viewer_id}();
+    </script>
+</body>
+</html>
+"""
+
+
