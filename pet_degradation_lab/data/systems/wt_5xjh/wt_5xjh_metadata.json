@@ -2,21 +2,21 @@
   "system_id": "wt_5xjh",
   "is_holo": true,
   "num_solute_atoms": 4252,
-  "num_waters": 10030,
-  "num_na_ions": 27,
-  "num_cl_ions": 33,
-  "total_particles": 33976,
+  "num_waters": 9817,
+  "num_na_ions": 26,
+  "num_cl_ions": 32,
+  "total_particles": 33335,
   "net_charge": -0.0,
   "ionic_strength_M": 0.15,
   "box_dimensions_nm": [
-    7.097057712536435,
-    7.097057712536435,
-    7.097057712536435
+    7.056772855242302,
+    7.056772855242302,
+    7.056772855242302
   ],
-  "potential_energy_kj_mol": -482820.93,
+  "potential_energy_kj_mol": -472324.78,
   "is_stable": true,
   "pdb_path": "/home/luckycelestial/Pavithran/QCatalyst/Q_Catalyst/pet_degradation_lab/data/systems/wt_5xjh/wt_5xjh_solvated.pdb",
   "system_xml_path": "/home/luckycelestial/Pavithran/QCatalyst/Q_Catalyst/pet_degradation_lab/data/systems/wt_5xjh/wt_5xjh_system.xml",
   "integrator_xml_path": "/home/luckycelestial/Pavithran/QCatalyst/Q_Catalyst/pet_degradation_lab/data/systems/wt_5xjh/wt_5xjh_integrator.xml",
-  "summary": "System wt_5xjh built (Holo): 33976 particles (4252 solute, 10030 waters, 27 Na+, 33 Cl-), Box: 7.10x7.10x7.10 nm, Net Charge: -0.00 e, Potential Energy: -482820.9 kJ/mol"
+  "summary": "System wt_5xjh built (Holo): 33335 particles (4252 solute, 9817 waters, 26 Na+, 32 Cl-), Box: 7.06x7.06x7.06 nm, Net Charge: -0.00 e, Potential Energy: -472324.8 kJ/mol"
 }

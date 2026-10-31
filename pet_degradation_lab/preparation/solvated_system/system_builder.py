@@ -57,7 +57,11 @@ class SolvatedSystemBuilder:
         self.ionic_strength = ionic_strength_M * unit.molar
         self.temperature = temperature_K * unit.kelvin
         if ff_xml_path is None:
-            ff_xml_path = Path(__file__).parent.parent / "forcefield" / "pet_gaff2_resp.xml"
+            val_path = Path(__file__).parent.parent / "forcefield" / "pet_gaff2_resp_validated.xml"
+            if val_path.exists():
+                ff_xml_path = val_path
+            else:
+                ff_xml_path = Path(__file__).parent.parent / "forcefield" / "pet_gaff2_resp.xml"
         self.ff_xml_path = ff_xml_path
         self.forcefield = app.ForceField(
             "amber14/protein.ff14SB.xml",

@@ -36,12 +36,18 @@ def repo_paths():
     lab_root = test_file.parent.parent
     snap_base = lab_root / "data" / "project_snapshots" / "snap_baseline_v1" / "raw" / "data" / "structures"
     systems_dir = lab_root / "data" / "systems"
-    ff_xml = lab_root / "preparation" / "forcefield" / "pet_gaff2_resp.xml"
+    ff_xml = lab_root / "preparation" / "forcefield" / "pet_gaff2_resp_validated.xml"
+    if not ff_xml.exists():
+        ff_xml = lab_root / "preparation" / "forcefield" / "pet_gaff2_resp.xml"
+    resp_artifacts_dir = lab_root / "data" / "forcefield" / "resp_artifacts"
+    qm_scans_dir = lab_root / "data" / "forcefield" / "qm_scans"
     return {
         "lab_root": lab_root,
         "snap_base": snap_base,
         "systems_dir": systems_dir,
         "ff_xml": ff_xml,
+        "resp_artifacts_dir": resp_artifacts_dir,
+        "qm_scans_dir": qm_scans_dir,
         "5xjh": snap_base / "5XJH.pdb",
         "7sh6": snap_base / "7SH6.pdb",
         "var_eng_004": snap_base / "variants" / "VAR-ENG-004.pdb",
@@ -211,3 +217,160 @@ def test_scientific_boundary_invariants():
     # Invariant 2: Binding energy is not equal to catalytic turnover rate
     binding_energy_equals_catalytic_rate = False
     assert binding_energy_equals_catalytic_rate is False
+
+
+def test_authentic_resp_charge_provenance(repo_paths):
+    """Verify authentic QM/RESP fitting artifacts from PySCF RHF/6-31G* calculations."""
+    resp_dir = repo_paths["resp_artifacts_dir"]
+    charges_json = resp_dir / "BHET_stage2_resp_charges.json"
+    summary_json = resp_dir / "BHET_resp_summary.json"
+    raw_esp_npz = resp_dir / "BHET_raw_qm_esp.npz"
+
+    assert charges_json.exists(), f"RESP charges JSON missing: {charges_json}"
+    assert summary_json.exists(), f"RESP summary JSON missing: {summary_json}"
+    assert raw_esp_npz.exists(), f"Raw QM ESP npz missing: {raw_esp_npz}"
+
+    with open(summary_json, "r") as f:
+        summary = json.load(f)
+
+    assert summary["qm_method"] == "HF"
+    assert summary["basis_set"] == "6-31g*"
+    assert summary["scf_energy_hartree"] < -911.0
+    assert summary["num_grid_points"] >= 800
+    assert summary["rrms_error"] < 0.15
+    assert abs(summary["total_fitted_charge"]) < 1e-6
+
+    with open(charges_json, "r") as f:
+        charges_data = json.load(f)
+    charges = charges_data["charges"]
+
+    assert len(charges) == 32
+    assert abs(sum(charges.values())) < 1e-6
+    # Carbonyl carbon must be strongly positive (~0.8 e)
+    assert charges["C7"] > 0.70
+    # Carbonyl oxygen must be strongly negative (~-0.6 e)
+    assert charges["O1"] < -0.50
+
+
+def test_qm_torsional_scans_and_barriers(repo_paths):
+    """Verify ab initio B3LYP/6-31G* torsional scan profiles and refined parameter barriers."""
+    scans_dir = repo_paths["qm_scans_dir"]
+    ester_scan_json = scans_dir / "ester_aromatic_torsion_scan.json"
+    glycol_scan_json = scans_dir / "ethylene_glycol_torsion_scan.json"
+
+    assert ester_scan_json.exists(), f"Ester scan missing: {ester_scan_json}"
+    assert glycol_scan_json.exists(), f"Glycol scan missing: {glycol_scan_json}"
+
+    with open(ester_scan_json, "r") as f:
+        ester_data = json.load(f)
+
+    assert len(ester_data["angles_deg"]) >= 7
+    # Coplanar (0 deg) must be the minimum
+    e_0 = ester_data["qm_relative_kcal_mol"][0]
+    e_90 = ester_data["qm_relative_kcal_mol"][-1]
+    assert e_0 == 0.0
+    # QM barrier at 90 deg is ~6.7 kcal/mol
+    assert 5.0 <= e_90 <= 8.5
+    # Generic GAFF2 barrier is only ~2.1 kcal/mol (underestimates barrier)
+    assert ester_data["mm_generic_kcal_mol"][-1] < 3.0
+    assert ester_data["mm_refined_barrier_kcal_mol"] > 8.0
+
+    with open(glycol_scan_json, "r") as f:
+        glycol_data = json.load(f)
+
+    assert len(glycol_data["angles_deg"]) >= 7
+    # Cis barrier at 0 deg must be the highest in vacuum
+    e_cis = glycol_data["qm_relative_kcal_mol"][0]
+    assert e_cis > 7.0
+
+
+def test_active_site_michaelis_geometry(repo_paths):
+    """Verify Bürgi-Dunitz attack trajectory and oxyanion hole geometry without steric clash."""
+    ligand_dir = repo_paths["systems_dir"] / "ligands"
+    prep_dir = repo_paths["systems_dir"] / "prepared_proteins"
+    parser = app.PDBFile
+
+    for sys_id in ["wt_5xjh", "fast_7sh6", "var_eng_004"]:
+        lig_path = ligand_dir / f"{sys_id}_bhet.pdb"
+        prot_path = prep_dir / f"{sys_id}_prepared.pdb"
+
+        assert lig_path.exists(), f"Ligand PDB missing: {lig_path}"
+        assert prot_path.exists(), f"Prepared protein PDB missing: {prot_path}"
+
+        lig_pdb = parser(str(lig_path))
+        prot_pdb = parser(str(prot_path))
+
+        # Ligand atoms: C7 and O1
+        lig_coords = lig_pdb.positions.value_in_unit(unit.angstroms)
+        c7_pos = None
+        o1_pos = None
+        for a in lig_pdb.topology.atoms():
+            if a.name == "C7":
+                c7_pos = np.array(lig_coords[a.index])
+            elif a.name == "O1":
+                o1_pos = np.array(lig_coords[a.index])
+
+        assert c7_pos is not None, f"C7 not found in {lig_path}"
+        assert o1_pos is not None, f"O1 not found in {lig_path}"
+
+        # Find Ser160 OG and oxyanion amides in protein
+        prot_coords = prot_pdb.positions.value_in_unit(unit.angstroms)
+        res_list = list(prot_pdb.topology.residues())
+
+        # Find catalytic Ser (Ser whose OG is ~2.9 A from His NE2)
+        cat_ser_og = None
+        met_n = None
+        tyr_n = None
+        for i, r in enumerate(res_list):
+            if r.name == "SER":
+                og_atom = [a for a in r.atoms() if a.name == "OG"]
+                if og_atom:
+                    og_coord = np.array(prot_coords[og_atom[0].index])
+                    for h in res_list:
+                        if h.name in ["HIS", "HID", "HIE", "HIP"]:
+                            ne2 = [a for a in h.atoms() if a.name == "NE2"]
+                            if ne2:
+                                d = np.linalg.norm(og_coord - np.array(prot_coords[ne2[0].index]))
+                                if 2.7 <= d <= 3.2:
+                                    cat_ser_og = og_coord
+                                    if i + 1 < len(res_list):
+                                        met_atom = [a for a in res_list[i + 1].atoms() if a.name == "N"]
+                                        if met_atom:
+                                            met_n = np.array(prot_coords[met_atom[0].index])
+                                    break
+                    if cat_ser_og is not None:
+                        break
+
+        # Tyr87 N
+        for r in res_list:
+            if r.name == "TYR":
+                n_atom = [a for a in r.atoms() if a.name == "N"]
+                if n_atom:
+                    coord = np.array(prot_coords[n_atom[0].index])
+                    d = np.linalg.norm(coord - cat_ser_og)
+                    if 4.5 <= d <= 6.5:
+                        tyr_n = coord
+                        break
+
+        assert cat_ser_og is not None, f"Catalytic Ser OG not resolved for {sys_id}"
+        assert met_n is not None, f"Met161 N not resolved for {sys_id}"
+        assert tyr_n is not None, f"Tyr87 N not resolved for {sys_id}"
+
+        # 1. Attack distance: Ser160 OG -> C7
+        d_attack = float(np.linalg.norm(cat_ser_og - c7_pos))
+        assert 2.75 <= d_attack <= 3.15, f"{sys_id}: Attack distance {d_attack:.2f} A out of bounds"
+
+        # 2. Bürgi-Dunitz angle: angle(OG - C7 = O1)
+        v_sc = cat_ser_og - c7_pos
+        v_oc = o1_pos - c7_pos
+        cos_bd = np.dot(v_sc, v_oc) / (np.linalg.norm(v_sc) * np.linalg.norm(v_oc))
+        ang_bd = float(np.arccos(np.clip(cos_bd, -1.0, 1.0)) * 180.0 / np.pi)
+        assert 95.0 <= ang_bd <= 115.0, f"{sys_id}: BD angle {ang_bd:.1f} deg out of [95, 115]"
+
+        # 3. Oxyanion hole coordination: no steric collision (d >= 2.70 A)
+        d_met_o = float(np.linalg.norm(met_n - o1_pos))
+        d_tyr_o = float(np.linalg.norm(tyr_n - o1_pos))
+        assert d_met_o >= 2.70, f"{sys_id}: Steric collision with Met161 N: {d_met_o:.2f} A < 2.70 A"
+        assert d_tyr_o >= 2.70, f"{sys_id}: Steric collision with Tyr87 N: {d_tyr_o:.2f} A < 2.70 A"
+        assert d_met_o <= 3.85, f"{sys_id}: Met161 N too far from O1: {d_met_o:.2f} A"
+

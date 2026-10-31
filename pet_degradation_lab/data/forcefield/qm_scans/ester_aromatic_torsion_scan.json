@@ -1,0 +1,63 @@
+{
+  "scan_name": "ester_aromatic_torsion",
+  "molecule_name": "methyl_benzoate",
+  "smiles": "O=C(OC)c1ccccc1",
+  "dihedral_atoms": [
+    0,
+    1,
+    4,
+    5
+  ],
+  "angles_deg": [
+    0.0,
+    15.0,
+    30.0,
+    45.0,
+    60.0,
+    75.0,
+    90.0
+  ],
+  "qm_energies_hartree": [
+    -460.11703752705534,
+    -460.1166288042392,
+    -460.1152109902587,
+    -460.1127316535268,
+    -460.1097347062734,
+    -460.1072770210444,
+    -460.10636356812404
+  ],
+  "qm_relative_kcal_mol": [
+    0.0,
+    0.256,
+    1.146,
+    2.702,
+    4.583,
+    6.125,
+    6.698
+  ],
+  "mm_generic_kcal_mol": [
+    0.0,
+    0.141,
+    0.525,
+    1.05,
+    1.575,
+    1.959,
+    2.1
+  ],
+  "mm_refined_kcal_mol": [
+    0.0,
+    0.643,
+    2.4,
+    4.8,
+    7.2,
+    8.957,
+    9.6
+  ],
+  "rmse_generic_kcal_mol": 2.691,
+  "rmse_refined_kcal_mol": 2.05,
+  "mae_generic_kcal_mol": 2.023,
+  "mae_refined_kcal_mol": 1.727,
+  "qm_barrier_kcal_mol": 6.7,
+  "mm_refined_barrier_kcal_mol": 9.6,
+  "summary_path": "/home/luckycelestial/Pavithran/QCatalyst/Q_Catalyst/pet_degradation_lab/data/forcefield/qm_scans/ester_aromatic_torsion_scan.json"
+}

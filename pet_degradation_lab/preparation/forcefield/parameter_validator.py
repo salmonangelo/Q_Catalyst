@@ -39,7 +39,11 @@ class ParameterValidator:
 
     def __init__(self, xml_path: Optional[Path] = None):
         if xml_path is None:
-            xml_path = Path(__file__).parent / "pet_gaff2_resp.xml"
+            val_path = Path(__file__).parent / "pet_gaff2_resp_validated.xml"
+            if val_path.exists():
+                xml_path = val_path
+            else:
+                xml_path = Path(__file__).parent / "pet_gaff2_resp.xml"
         self.xml_path = xml_path
 
     def validate_parameters(self) -> ParameterValidationReport:
